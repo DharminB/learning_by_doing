@@ -5,12 +5,7 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /Global Options1
-        - /Status1
-        - /Grid1
-        - /TF1
         - /TF1/Frames1
-        - /RobotModel1
-        - /RobotModel1/Links1
       Splitter Ratio: 0.5
     Tree Height: 456
   - Class: rviz/Selection
@@ -59,18 +54,20 @@ Visualization Manager:
       Frames:
         All Enabled: false
         base_link:
-          Value: true
+          Value: false
+        end_effector:
+          Value: false
         link0:
-          Value: true
+          Value: false
         link1:
-          Value: true
+          Value: false
         link2:
-          Value: true
+          Value: false
         link3:
-          Value: true
+          Value: false
       Marker Scale: 1
       Name: TF
-      Show Arrows: true
+      Show Arrows: false
       Show Axes: true
       Show Names: true
       Tree:
@@ -79,10 +76,11 @@ Visualization Manager:
             link1:
               link2:
                 link3:
-                  {}
+                  end_effector:
+                    {}
       Update Interval: 0
       Value: true
-    - Alpha: 0.949999988
+    - Alpha: 0.699999988
       Class: rviz/RobotModel
       Collision Enabled: false
       Enabled: true
@@ -93,6 +91,11 @@ Visualization Manager:
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
         base_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        end_effector:
           Alpha: 1
           Show Axes: false
           Show Trail: false
@@ -123,6 +126,20 @@ Visualization Manager:
       Update Interval: 0
       Value: true
       Visual Enabled: true
+    - Class: rviz/Axes
+      Enabled: true
+      Length: 0.150000006
+      Name: EndEffector
+      Radius: 0.0199999996
+      Reference Frame: end_effector
+      Value: true
+    - Class: rviz/Axes
+      Enabled: true
+      Length: 0.5
+      Name: Link0
+      Radius: 0.0500000007
+      Reference Frame: link0
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -148,25 +165,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 4.12818909
+      Distance: 3.4803884
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.0599999987
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0.156060502
-        Y: 0.45237124
-        Z: 0.553842485
+        X: 0.193596125
+        Y: 0.173390195
+        Z: 0.280709684
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.0500000007
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.00999999978
-      Pitch: 0.644797325
+      Pitch: 0.689797282
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 4.64857912
+      Yaw: 4.70358086
     Saved: ~
 Window Geometry:
   Displays:

@@ -53,6 +53,13 @@
             <origin xyz='0.0 0.0 0.5' rpy='0.0 0.0 0.0' />
         <material name="grey"/>
         </visual>
+        <visual>
+            <geometry>
+                <cylinder length="0.1" radius="0.07"/>
+            </geometry>
+            <origin xyz='0.0 0.0 1.0' rpy='1.57 0.0 0.0' />
+        <material name="grey"/>
+        </visual>
     </link>
 
     <joint name="joint2" type="continuous">
@@ -70,6 +77,13 @@
             <origin xyz='0.3 0.0 0.0' rpy='0.0 1.57 0.0' />
         <material name="light_grey"/>
         </visual>
+        <visual>
+            <geometry>
+                <cylinder length="0.06" radius="0.04"/>
+            </geometry>
+            <origin xyz='0.6 0.0 0.0' rpy='0.0 0.0 0.0' />
+        <material name="light_grey"/>
+        </visual>
     </link>
 
     <joint name="joint3" type="continuous">
@@ -85,6 +99,23 @@
                 <cylinder length="0.4" radius="0.02"/>
             </geometry>
             <origin xyz='0.2 0.0 0.0' rpy='0.0 1.57 0.0' />
+        <material name="lighter_grey"/>
+        </visual>
+    </link>
+
+    <joint name="joint_ee" type="fixed">
+        <parent link="link3"/>
+        <child link="end_effector"/>
+        <origin xyz="0.4 0.0 0.0" rpy="0 0 0.0" />
+        <axis xyz="0 0 1" />
+    </joint>
+
+    <link name="end_effector">
+        <visual>
+            <geometry>
+                <sphere radius="0.03"/>
+            </geometry>
+            <origin xyz='0.0 0.0 0.0' rpy='0.0 0.0 0.0' />
         <material name="lighter_grey"/>
         </visual>
     </link>
