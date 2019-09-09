@@ -38,11 +38,12 @@
         </visual>
     </link>
 
-    <joint name="joint1" type="continuous">
+    <joint name="joint1" type="revolute">
         <parent link="link0"/>
         <child link="link1"/>
         <origin xyz="0 0 0.05" rpy="0 0 0.0" />
         <axis xyz="0 0 1" />
+        <limit effort="30" velocity="1.0" lower="-3.13" upper="3.13"/>
     </joint>
 
     <link name="link1">
@@ -62,11 +63,12 @@
         </visual>
     </link>
 
-    <joint name="joint2" type="continuous">
+    <joint name="joint2" type="revolute">
         <parent link="link1"/>
         <child link="link2"/>
         <origin xyz="0 0 1.0" rpy="1.57 -1.57 0.0" />
         <axis xyz="0 0 1" />
+        <limit effort="30" velocity="1.0" lower="-2.13" upper="2.13"/>
     </joint>
 
     <link name="link2">
@@ -86,11 +88,12 @@
         </visual>
     </link>
 
-    <joint name="joint3" type="continuous">
+    <joint name="joint3" type="revolute">
         <parent link="link2"/>
         <child link="link3"/>
         <origin xyz="0.6 0.0 0.0" rpy="0 0 0.0" />
         <axis xyz="0 0 1" />
+        <limit effort="30" velocity="1.0" lower="-2.13" upper="2.13"/>
     </joint>
 
     <link name="link3">
