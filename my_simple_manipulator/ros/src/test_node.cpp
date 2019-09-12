@@ -8,6 +8,7 @@
 #include <kdl/chainfksolverpos_recursive.hpp>
 #include <kdl/chainiksolverpos_lma.hpp>
 #include <geometry_msgs/Pose.h>
+#include <urdf/model.h>
 
 int main(int argc, char *argv[])
 {
@@ -32,30 +33,46 @@ int main(int argc, char *argv[])
     ROS_INFO_STREAM("Successfully created kdl chain");
     std::cout << my_chain.getNrOfJoints() << " joints found in chain" << std::endl;
 
-    KDL::JntArray joint_pos(my_chain.getNrOfJoints());
-    for (int i = 0; i < joint_pos.rows(); i++)
-    {
-        std::cout << joint_pos(i) << std::endl;
-    }
-    joint_pos(1) = -3.0;
-    KDL::Frame cart_pos;
-    KDL::ChainFkSolverPos_recursive fk_solver(my_chain);
-    fk_solver.JntToCart(joint_pos, cart_pos);
 
-    geometry_msgs::Pose pose;
-    tf::poseKDLToMsg(cart_pos, pose);
-    ROS_INFO_STREAM(pose);
-
-    KDL::ChainIkSolverPos_LMA ik_solver(my_chain);
-    KDL::JntArray init_joint_pos(my_chain.getNrOfJoints());
-    KDL::JntArray final_joint_pos(my_chain.getNrOfJoints());
-    KDL::Frame ee_pose(KDL::Vector(0.84, 0.0, 0.98));
-    int status = ik_solver.CartToJnt(init_joint_pos, ee_pose, final_joint_pos);
-    std::cout << status << std::endl;
-    for (int i = 0; i < final_joint_pos.rows(); i++)
+    urdf::Model model;
+    if (!model.initParam("/robot_description"))
     {
-        std::cout << final_joint_pos(i) << std::endl;
+        ROS_ERROR("Failed to parse urdf file");
+        return 1;
     }
+    boost::shared_ptr<const urdf::Joint> joint;
+    joint = model.getJoint("joint2");
+    if (!joint)
+    {
+        ROS_ERROR("Failed to get joint");
+    }
+    std::cout << joint->name << std::endl;
+    std::cout << joint->limits->upper << std::endl;
+
+    /* KDL::JntArray joint_pos(my_chain.getNrOfJoints()); */
+    /* for (int i = 0; i < joint_pos.rows(); i++) */
+    /* { */
+    /*     std::cout << joint_pos(i) << std::endl; */
+    /* } */
+    /* joint_pos(1) = -3.0; */
+    /* KDL::Frame cart_pos; */
+    /* KDL::ChainFkSolverPos_recursive fk_solver(my_chain); */
+    /* fk_solver.JntToCart(joint_pos, cart_pos); */
+
+    /* geometry_msgs::Pose pose; */
+    /* tf::poseKDLToMsg(cart_pos, pose); */
+    /* ROS_INFO_STREAM(pose); */
+
+    /* KDL::ChainIkSolverPos_LMA ik_solver(my_chain); */
+    /* KDL::JntArray init_joint_pos(my_chain.getNrOfJoints()); */
+    /* KDL::JntArray final_joint_pos(my_chain.getNrOfJoints()); */
+    /* KDL::Frame ee_pose(KDL::Vector(0.84, 0.0, 0.98)); */
+    /* int status = ik_solver.CartToJnt(init_joint_pos, ee_pose, final_joint_pos); */
+    /* std::cout << status << std::endl; */
+    /* for (int i = 0; i < final_joint_pos.rows(); i++) */
+    /* { */
+    /*     std::cout << final_joint_pos(i) << std::endl; */
+    /* } */
 
 
     ros::spinOnce();

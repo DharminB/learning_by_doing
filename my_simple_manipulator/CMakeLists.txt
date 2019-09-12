@@ -37,6 +37,7 @@ include_directories(
 # add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 add_executable(test_node ros/src/test_node.cpp)
+add_executable(arm_controller ros/src/arm_controller.cpp)
 
-target_link_libraries(test_node ${catkin_LIBRARIES}
-)
+target_link_libraries(test_node ${catkin_LIBRARIES})
+target_link_libraries(arm_controller ${catkin_LIBRARIES})

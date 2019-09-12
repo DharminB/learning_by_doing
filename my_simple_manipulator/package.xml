@@ -2,7 +2,7 @@
 <package format="2">
   <name>my_simple_manipulator</name>
   <version>0.0.0</version>
-  <description>The my_simple_manipulator package</description>
+  <description>A ros package with a simple manipulator arm related things.</description>
 
   <maintainer email="dharmingeo@gmail.com">Dharmin B.</maintainer>
 
