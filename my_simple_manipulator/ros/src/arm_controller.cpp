@@ -1,3 +1,6 @@
+#include <algorithm>
+#include <math.h>
+
 #include <ros/ros.h>
 
 #include <sensor_msgs/JointState.h>
@@ -15,12 +18,13 @@
 #include <kdl/chainfksolverpos_recursive.hpp>
 #include <kdl/chainiksolverpos_lma.hpp>
 
+#include <pid_controller.cpp>
+
 class ArmController
 {
     private:
         int control_rate;
-        ros::Publisher joint_state_pub;
-        ros::Subscriber position_command_sub;
+
         KDL::Chain my_chain;
         sensor_msgs::JointState joint_state_msg;
         std::vector<std::string> joint_names;
@@ -31,14 +35,21 @@ class ArmController
         std::vector<double> target_joint_velocities;
         std::vector<double> current_joint_positions;
         std::vector<double> current_joint_velocities;
+        std::vector<PIDController> position_controllers;
 
         /* pid related variables */
-        double proportional_factor = 0.5;
-        double integral_factor = 0.1;
+        double proportional_factor = 1.5;
+        double integral_factor = 0.005;
         double differential_factor = 0.1;
-        std::vector<double> integral_value;
-        std::vector<double> differential_value;
+        double position_threshold = 0.001;
+        double velocity_threshold = 0.001;
+        double max_vel = 0.5;
+        double min_vel = 0.001;
+
         ros::NodeHandle nh;
+        ros::Publisher joint_state_pub;
+        ros::Subscriber position_command_sub;
+        ros::Subscriber velocity_command_sub;
 
         /*
          * get the name of the segment which has no children
@@ -48,11 +59,11 @@ class ArmController
 
         void positionCommandCb(const sensor_msgs::ChannelFloat32::ConstPtr& msg);
 
+        void velocityCommandCb(const sensor_msgs::ChannelFloat32::ConstPtr& msg);
+
         void fillJointStateMsg();
 
         void initialiseJoints();
-
-        double positionPController(double current, double target);
 
     public:
         ArmController(int control_rate);
@@ -98,49 +109,60 @@ ArmController::ArmController(int control_rate): nh("~")
     position_command_sub = nh.subscribe<sensor_msgs::ChannelFloat32>
                                         ("position_command", 1,
                                          &ArmController::positionCommandCb, this);
+    velocity_command_sub = nh.subscribe<sensor_msgs::ChannelFloat32>
+                                        ("velocity_command", 1,
+                                         &ArmController::velocityCommandCb, this);
 }
 
 void ArmController::update()
 {
-    std::cout << "Target position: ";
-    for (double joint_position : this->target_joint_positions)
-        std::cout << joint_position << " ";
-    std::cout << std::endl;
     for (int i = 0; i < this->joint_names.size(); i++)
     {
-        this->current_joint_velocities[i] = this->positionPController(
-                this->current_joint_positions[i], this->target_joint_positions[i]);
+        if (this->target_joint_positions.size() > 0)
+        {
+            double vel = this->position_controllers[i].control(this->current_joint_positions[i],
+                                                        this->target_joint_positions[i]);
+            if (vel == 0.0)
+                this->current_joint_velocities[i] = vel;
+            else
+            {
+                int sign = (vel > 0.0) ? 1 : -1;
+                this->current_joint_velocities[i] = sign * std::max(this->min_vel, std::min(this->max_vel, fabs(vel)));
+            }
+        }
+        else if (this->target_joint_velocities.size() > 0)
+        {
+            this->current_joint_velocities[i] = this->target_joint_velocities[i];
+            double future_position = this->current_joint_positions[i] + this->current_joint_velocities[i] / this->control_rate;
+            if (future_position < this->joint_lower_limits[i] 
+                    || future_position > this->joint_upper_limits[i])
+            {
+                ROS_WARN_STREAM("Joint value for " << this->joint_names[i]
+                                << " is outside limit! Stopping motion.");
+                this->current_joint_velocities[i] = 0.0;
+                this->target_joint_velocities[i] = 0.0;
+                bool all_zero = true;
+                for (double vel : this->target_joint_velocities)
+                {
+                    if (vel != 0.0) { all_zero = false; break; }
+                }
+                if (all_zero)
+                    this->target_joint_velocities.clear();
+            }
+        }
+        else
+            break;
         this->current_joint_positions[i] += this->current_joint_velocities[i] / this->control_rate;
     }
-    std::cout << "current position: ";
-    for (double joint_position : this->current_joint_positions)
-        std::cout << joint_position << " ";
-    std::cout << std::endl;
-    std::cout << "current velocities: ";
-    for (double joint_position : this->current_joint_velocities)
-        std::cout << joint_position << " ";
-    std::cout << std::endl;
+
     this->fillJointStateMsg();
-    ROS_INFO_STREAM(this->joint_state_msg);
+    /* ROS_INFO_STREAM(this->joint_state_msg); */
     
     joint_state_msg.header.stamp = ros::Time::now();
     joint_state_pub.publish(joint_state_msg);
 }
 
-double ArmController::positionPController(double current, double target)
-{
-    double error = target - current;
-    std::cout << error << std::endl;
-    std::cout << fabs(error) << std::endl;
-    if (fabs(error) < 0.001)
-        return 0.0;
-    double velocity = error * this->proportional_factor;
-    std::cout << velocity << std::endl;
-    return velocity;
-}
-
-void ArmController::positionCommandCb
-                    (const sensor_msgs::ChannelFloat32::ConstPtr& msg)
+void ArmController::positionCommandCb(const sensor_msgs::ChannelFloat32::ConstPtr& msg)
 {
     ROS_INFO_STREAM(*msg);
     /* check for number of values provided */
@@ -164,10 +186,45 @@ void ArmController::positionCommandCb
         }
     }
     /* set target joint positions and reset target joint vel */
+    this->target_joint_positions.clear();
+    this->target_joint_velocities.clear();
     for (int i = 0; i < this->joint_names.size(); i++)
     {
-        this->target_joint_positions[i] = msg->values[i];
-        this->target_joint_velocities[i] = 0.0;
+        this->target_joint_positions.push_back(msg->values[i]);
+        this->position_controllers[i].reset();
+    }
+}
+
+void ArmController::velocityCommandCb(const sensor_msgs::ChannelFloat32::ConstPtr& msg)
+{
+    ROS_INFO_STREAM(*msg);
+    /* check for number of values provided */
+    if (msg->values.size() != this->joint_names.size())
+    {
+        ROS_WARN_STREAM("Number of joints mismatch! Expecting " 
+                        << this->joint_names.size() << " values.");
+        return;
+    }
+    /* check for joint limits */
+    for (int i = 0; i < msg->values.size(); i++)
+    {
+        if (msg->values[i] < -1 * this->max_vel
+                || msg->values[i] > this->max_vel)
+        {
+            ROS_WARN_STREAM("Joint velocity for " << this->joint_names[i]
+                            << " is outside limit! Expecting values between "
+                            << -1 * this->max_vel << " and "
+                            << this->max_vel << ".");
+            return;
+        }
+    }
+    /* set target joint positions and reset target joint vel */
+    this->target_joint_positions.clear();
+    this->target_joint_velocities.clear();
+    for (int i = 0; i < this->joint_names.size(); i++)
+    {
+        this->target_joint_velocities.push_back(msg->values[i]);
+        this->position_controllers[i].reset();
     }
 }
 
@@ -219,10 +276,12 @@ void ArmController::initialiseJoints()
     {
         this->current_joint_positions.push_back(0.0);
         this->current_joint_velocities.push_back(0.0);
-        this->target_joint_positions.push_back(0.0);
-        this->target_joint_velocities.push_back(0.0);
-        this->integral_value.push_back(0.0);
-        this->differential_value.push_back(0.0);
+        /* this->target_joint_positions.push_back(0.0); */
+        /* this->target_joint_velocities.push_back(0.0); */
+        PIDController pid(this->proportional_factor, this->integral_factor,
+                          this->differential_factor, this->control_rate,
+                          this->position_threshold);
+        this->position_controllers.push_back(pid);
     }
 }
 
