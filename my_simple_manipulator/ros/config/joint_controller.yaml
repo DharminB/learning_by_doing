@@ -1,0 +1,5 @@
+type: "effort_controllers/JointGroupEffortController"
+joints:
+    - joint1
+    - joint2
+    - joint3
