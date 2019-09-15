@@ -4,10 +4,48 @@
     <xacro:property name="link1_length" value="0.4" />
     <xacro:property name="link2_length" value="0.6" />
     <xacro:property name="link3_length" value="0.4" />
+    <xacro:property name="base_length" value="0.5" />
     <xacro:property name="link1_radius" value="0.05" />
     <xacro:property name="link2_radius" value="0.03" />
     <xacro:property name="link3_radius" value="0.02" />
-    <xacro:property name="base_length" value="0.5" />
+    <xacro:property name="link1_mass" value="1.0" />
+    <xacro:property name="link2_mass" value="0.6" />
+    <xacro:property name="link3_mass" value="0.4" />
+    <xacro:property name="base_mass" value="10.0" />
+    <xacro:property name="ee_mass" value="0.2" />
+
+    <!-- collision_shortening_factor -->
+    <xacro:property name="csf" value="0.8" /> 
+
+    <xacro:macro name="cylinder_inertia" params="mass length radius">
+        <inertial>
+            <mass value="${mass}" />
+            <inertia ixx="${(mass/12)*(3*radius*radius + length*length)}"
+                     iyy="${(mass/12)*(3*radius*radius + length*length)}"
+                     iyz="0.0" ixy="0.0" ixz="0.0"
+                     izz="${(mass/2)*(radius*radius)}" />
+        </inertial>
+    </xacro:macro>
+
+    <xacro:macro name="cuboid_inertia" params="mass length breadth height">
+        <inertial>
+            <mass value="${mass}" />
+            <inertia ixx="${(mass/12)*(breadth*breadth + height*height)}"
+                     iyy="${(mass/12)*(height*height + length*length)}"
+                     iyz="0.0" ixy="0.0" ixz="0.0"
+                     izz="${(mass/12)*(breadth*breadth + length*length)}" />
+        </inertial>
+    </xacro:macro>
+
+    <xacro:macro name="sphere_inertia" params="mass radius">
+        <inertial>
+            <mass value="${mass}" />
+            <inertia ixx="${(mass*0.4)*(radius*radius)}"
+                     iyy="${(mass*0.4)*(radius*radius)}"
+                     iyz="0.0" ixy="0.0" ixz="0.0"
+                     izz="${(mass*0.4)*(radius*radius)}" />
+        </inertial>
+    </xacro:macro>
 
     <material name="black">
         <color rgba="0.0 0.0 0.0 1.0"/>
@@ -25,7 +63,7 @@
     <link name='base_link'>
         <visual>
             <geometry>
-                <box size='0.0 0.0 0.0'/>
+                <box size='0.01 0.01 0.01'/>
             </geometry>
             <origin xyz='0.0 0.0 0.0' rpy='0.0 0.0 0.0' />
         </visual>      
@@ -43,8 +81,15 @@
                 <box size='${base_length} ${base_length} 0.1'/>
             </geometry>
             <origin xyz='0.0 0.0 0.0' rpy='0.0 0.0 0.0' />
-        <material name="black"/>
+            <material name="black"/>
         </visual>
+        <collision>
+            <geometry>
+                <box size='${base_length} ${base_length} 0.1'/>
+            </geometry>
+            <origin xyz='0.0 0.0 0.0' rpy='0.0 0.0 0.0' />
+        </collision>
+        <xacro:cuboid_inertia mass="${base_mass}" length="${base_length}" breadth="${base_length}" height="0.1"/>
     </link>
 
     <joint name="joint1" type="revolute">
@@ -61,15 +106,22 @@
                 <cylinder length="${link1_length}" radius="${link1_radius}"/>
             </geometry>
             <origin xyz='0.0 0.0 ${link1_length/2}' rpy='0.0 0.0 0.0' />
-        <material name="grey"/>
+            <material name="grey"/>
         </visual>
         <visual>
             <geometry>
                 <cylinder length="${link1_radius*2}" radius="${link1_radius*1.5}"/>
             </geometry>
             <origin xyz='0.0 0.0 ${link1_length}' rpy='1.57 0.0 0.0' />
-        <material name="grey"/>
+            <material name="grey"/>
         </visual>
+        <collision>
+            <geometry>
+                <cylinder length="${link1_length*csf}" radius="${link1_radius}"/>
+            </geometry>
+            <origin xyz='0.0 0.0 ${(link1_length/2)*csf}' rpy='0.0 0.0 0.0' />
+        </collision>
+        <xacro:cylinder_inertia mass="${link1_mass}" radius="${link1_radius}" length="${link1_length}" />
     </link>
 
     <joint name="joint2" type="revolute">
@@ -86,15 +138,22 @@
                 <cylinder length="${link2_length}" radius="${link2_radius}"/>
             </geometry>
             <origin xyz='${link2_length/2} 0.0 0.0' rpy='0.0 1.57 0.0' />
-        <material name="light_grey"/>
+            <material name="light_grey"/>
         </visual>
         <visual>
             <geometry>
                 <cylinder length="${link2_radius*2}" radius="${link2_radius*1.5}"/>
             </geometry>
             <origin xyz='${link2_length} 0.0 0.0' rpy='0.0 0.0 0.0' />
-        <material name="light_grey"/>
+            <material name="light_grey"/>
         </visual>
+        <collision>
+            <geometry>
+                <cylinder length="${link2_length*csf}" radius="${link2_radius}"/>
+            </geometry>
+            <origin xyz='${(link2_length/2)*csf} 0.0 0.0' rpy='0.0 1.57 0.0' />
+        </collision>
+        <xacro:cylinder_inertia mass="${link2_mass}" radius="${link2_radius}" length="${link2_length}" />
     </link>
 
     <joint name="joint3" type="revolute">
@@ -102,7 +161,7 @@
         <child link="link3"/>
         <origin xyz="${link2_length} 0.0 0.0" rpy="0 0 0.0" />
         <axis xyz="0 0 1" />
-        <limit effort="30" velocity="1.0" lower="-2.13" upper="2.13"/>
+        <limit effort="30" velocity="1.0" lower="-2.00" upper="2.00"/>
     </joint>
 
     <link name="link3">
@@ -111,8 +170,15 @@
                 <cylinder length="${link3_length}" radius="${link3_radius}"/>
             </geometry>
             <origin xyz='${link3_length/2} 0.0 0.0' rpy='0.0 1.57 0.0' />
-        <material name="lighter_grey"/>
+            <material name="lighter_grey"/>
         </visual>
+        <collision>
+            <geometry>
+                <cylinder length="${link3_length*csf}" radius="${link3_radius}"/>
+            </geometry>
+            <origin xyz='${(link3_length/2)*csf} 0.0 0.0' rpy='0.0 1.57 0.0' />
+        </collision>
+        <xacro:cylinder_inertia mass="${link3_mass}" radius="${link3_radius}" length="${link3_length}" />
     </link>
 
     <joint name="joint_ee" type="fixed">
@@ -128,8 +194,51 @@
                 <sphere radius="0.03"/>
             </geometry>
             <origin xyz='0.0 0.0 0.0' rpy='0.0 0.0 0.0' />
-        <material name="lighter_grey"/>
+            <material name="lighter_grey"/>
         </visual>
+        <collision>
+            <geometry>
+                <sphere radius="0.03"/>
+            </geometry>
+            <origin xyz='0.0 0.0 0.0' rpy='0.0 0.0 0.0' />
+        </collision>
+        <xacro:sphere_inertia mass="${ee_mass}" radius="0.03" />
     </link>
 
+    <transmission name="joint1_trans">
+        <type>transmission_interface/SimpleTransmission</type>
+        <actuator name="$joint1_motor">
+            <mechanicalReduction>1</mechanicalReduction>
+        </actuator>
+        <joint name="joint1">
+            <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+        </joint>
+    </transmission>
+
+    <transmission name="joint2_trans">
+        <type>transmission_interface/SimpleTransmission</type>
+        <actuator name="$joint2_motor">
+            <mechanicalReduction>1</mechanicalReduction>
+        </actuator>
+        <joint name="joint2">
+            <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+        </joint>
+    </transmission>
+
+    <transmission name="joint3_trans">
+        <type>transmission_interface/SimpleTransmission</type>
+        <actuator name="$joint3_motor">
+            <mechanicalReduction>1</mechanicalReduction>
+        </actuator>
+        <joint name="joint3">
+            <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+        </joint>
+    </transmission>
+
+    <!-- plugin for gazebo -->
+    <gazebo>
+        <plugin name="gazebo_ros_control" filename="libgazebo_ros_control.so">
+            <robotNamespace>/</robotNamespace>
+        </plugin>
+    </gazebo>
 </robot>
