@@ -1,17 +1,43 @@
 <?xml version="1.0"?>
 <launch>
+    <!-- these are the arguments you can pass this launch file, for example paused:=true -->
+    <arg name="paused" default="false"/>
+    <arg name="use_sim_time" default="true"/>
+    <arg name="gui" default="false"/>
+    <arg name="headless" default="false"/>
+    <arg name="debug" default="false"/>
+    <arg name="model" default="$(find my_simple_manipulator)/ros/config/my_robot.xacro"/>
+
+
+    <!-- We resume the logic in empty_world.launch, changing only the name of the world to be launched -->
+	<include file="$(find gazebo_ros)/launch/empty_world.launch">
+		<arg name="debug" value="$(arg debug)" />
+		<arg name="gui" value="$(arg gui)" />
+		<arg name="paused" value="$(arg paused)"/>
+		<arg name="use_sim_time" value="$(arg use_sim_time)"/>
+	</include>
+
     <!-- Robot description for rviz -->
-    <!-- <param name="robot_description" textfile="$(find my_simple_manipulator)/ros/config/my_robot.urdf" /> -->
-    <param name="robot_description" command="xacro --inorder '$(find my_simple_manipulator)/ros/config/my_robot.xacro'" />
+    <param name="robot_description" command="xacro --inorder $(arg model)" />
+
+	<!-- push robot_description to factory and spawn robot in gazebo -->
+	<node name="urdf_spawner" pkg="gazebo_ros" type="spawn_model"
+		args="-unpause -urdf -model robot -param robot_description"
+		respawn="false" output="screen" />
 
     <node pkg="robot_state_publisher" type="robot_state_publisher" name="rob_st_pub" />
 
-    <!-- <node pkg="joint_state_publisher" type="joint_state_publisher" name="rob_joint_pub" > -->
-    <!--     <param name="use_gui" type="bool" value="true"/> -->
-    <!-- </node> -->
+    <rosparam command="load" file="$(find my_simple_manipulator)/ros/config/joints.yaml"
+                ns="my_simple_manipulator_joint_state_controller" />
+
+    <rosparam command="load" file="$(find my_simple_manipulator)/ros/config/joint_controller.yaml"
+                ns="my_simple_manipulator/joint_controller" />
+
+    <node pkg="controller_manager" name="my_simple_manipulator_controller_spawner" type="spawner"
+        args="my_simple_manipulator_joint_state_controller my_simple_manipulator/joint_controller"
+        respawn="true" output="screen" />
 
     <!-- rviz for visualisation -->
     <node pkg="rviz" type="rviz" name="rviz" args="-d $(find my_simple_manipulator)/../my_rviz.rviz" />
-
 
 </launch>
