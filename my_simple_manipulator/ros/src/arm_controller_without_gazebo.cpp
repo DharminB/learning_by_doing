@@ -47,10 +47,9 @@ class ArmController
         double min_vel = 0.001;
 
         ros::NodeHandle nh;
-        ros::Publisher joint_effort_pub;
-        ros::Subscriber velocity_command_sub;
+        ros::Publisher joint_state_pub;
         ros::Subscriber position_command_sub;
-        ros::Subscriber joint_state_sub;
+        ros::Subscriber velocity_command_sub;
 
         /*
          * get the name of the segment which has no children
@@ -61,8 +60,6 @@ class ArmController
         void positionCommandCb(const sensor_msgs::ChannelFloat32::ConstPtr& msg);
 
         void velocityCommandCb(const sensor_msgs::ChannelFloat32::ConstPtr& msg);
-
-        void jointStateCb(const sensor_msgs::JointState::ConstPtr& msg);
 
         void fillJointStateMsg();
 
@@ -108,10 +105,7 @@ ArmController::ArmController(int control_rate): nh("~")
     }
 
     /* initialise publisher and subscribers */
-    event_out_pub = nh.advertise<std_msgs::String> ("event_out", 1);
-    joint_state_sub = nh.subscribe<sensor_msgs::JointState>
-                                        ("/joint_states", 1,
-                                         &ArmController::jointStateCb, this);
+    joint_state_pub = nh.advertise<sensor_msgs::JointState> ("/joint_states", 1);
     position_command_sub = nh.subscribe<sensor_msgs::ChannelFloat32>
                                         ("position_command", 1,
                                          &ArmController::positionCommandCb, this);
@@ -122,55 +116,50 @@ ArmController::ArmController(int control_rate): nh("~")
 
 void ArmController::update()
 {
-    /* for (int i = 0; i < this->joint_names.size(); i++) */
-    /* { */
-    /*     if (this->target_joint_positions.size() > 0) */
-    /*     { */
-    /*         double vel = this->position_controllers[i].control(this->current_joint_positions[i], */
-    /*                                                     this->target_joint_positions[i]); */
-    /*         if (vel == 0.0) */
-    /*             this->current_joint_velocities[i] = vel; */
-    /*         else */
-    /*         { */
-    /*             int sign = (vel > 0.0) ? 1 : -1; */
-    /*             this->current_joint_velocities[i] = sign * std::max(this->min_vel, std::min(this->max_vel, fabs(vel))); */
-    /*         } */
-    /*     } */
-    /*     else if (this->target_joint_velocities.size() > 0) */
-    /*     { */
-    /*         this->current_joint_velocities[i] = this->target_joint_velocities[i]; */
-    /*         double future_position = this->current_joint_positions[i] + this->current_joint_velocities[i] / this->control_rate; */
-    /*         if (future_position < this->joint_lower_limits[i] */ 
-    /*                 || future_position > this->joint_upper_limits[i]) */
-    /*         { */
-    /*             ROS_WARN_STREAM("Joint value for " << this->joint_names[i] */
-    /*                             << " is outside limit! Stopping motion."); */
-    /*             this->current_joint_velocities[i] = 0.0; */
-    /*             this->target_joint_velocities[i] = 0.0; */
-    /*             bool all_zero = true; */
-    /*             for (double vel : this->target_joint_velocities) */
-    /*             { */
-    /*                 if (vel != 0.0) { all_zero = false; break; } */
-    /*             } */
-    /*             if (all_zero) */
-    /*                 this->target_joint_velocities.clear(); */
-    /*         } */
-    /*     } */
-    /*     else */
-    /*         break; */
-    /*     this->current_joint_positions[i] += this->current_joint_velocities[i] / this->control_rate; */
-    /* } */
+    for (int i = 0; i < this->joint_names.size(); i++)
+    {
+        if (this->target_joint_positions.size() > 0)
+        {
+            double vel = this->position_controllers[i].control(this->current_joint_positions[i],
+                                                        this->target_joint_positions[i]);
+            if (vel == 0.0)
+                this->current_joint_velocities[i] = vel;
+            else
+            {
+                int sign = (vel > 0.0) ? 1 : -1;
+                this->current_joint_velocities[i] = sign * std::max(this->min_vel, std::min(this->max_vel, fabs(vel)));
+            }
+        }
+        else if (this->target_joint_velocities.size() > 0)
+        {
+            this->current_joint_velocities[i] = this->target_joint_velocities[i];
+            double future_position = this->current_joint_positions[i] + this->current_joint_velocities[i] / this->control_rate;
+            if (future_position < this->joint_lower_limits[i] 
+                    || future_position > this->joint_upper_limits[i])
+            {
+                ROS_WARN_STREAM("Joint value for " << this->joint_names[i]
+                                << " is outside limit! Stopping motion.");
+                this->current_joint_velocities[i] = 0.0;
+                this->target_joint_velocities[i] = 0.0;
+                bool all_zero = true;
+                for (double vel : this->target_joint_velocities)
+                {
+                    if (vel != 0.0) { all_zero = false; break; }
+                }
+                if (all_zero)
+                    this->target_joint_velocities.clear();
+            }
+        }
+        else
+            break;
+        this->current_joint_positions[i] += this->current_joint_velocities[i] / this->control_rate;
+    }
 
-    /* this->fillJointStateMsg(); */
-    /* /1* ROS_INFO_STREAM(this->joint_state_msg); *1/ */
+    this->fillJointStateMsg();
+    /* ROS_INFO_STREAM(this->joint_state_msg); */
     
-    /* joint_state_msg.header.stamp = ros::Time::now(); */
-    /* joint_state_pub.publish(joint_state_msg); */
-}
-
-void ArmController::jointStateCb(const sensor_msgs::JointState::ConstPtr& msg)
-{
-    ROS_INFO_STREAM(*msg);
+    joint_state_msg.header.stamp = ros::Time::now();
+    joint_state_pub.publish(joint_state_msg);
 }
 
 void ArmController::positionCommandCb(const sensor_msgs::ChannelFloat32::ConstPtr& msg)

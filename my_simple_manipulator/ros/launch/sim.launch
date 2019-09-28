@@ -36,7 +36,7 @@
     <!--     args="joint_state_controller joint1_position_controller joint2_position_controller joint3_position_controller" -->
     <!--     respawn="true" output="screen" /> -->
     <node pkg="controller_manager" name="msm_controller_spawner" type="spawner"
-        args="joint_state_controller joint_position joint1_velocity"
+        args="joint_state_controller joint1_velocity joint2_velocity joint3_velocity"
         respawn="true" output="screen" />
 
     <!-- rviz for visualisation -->
