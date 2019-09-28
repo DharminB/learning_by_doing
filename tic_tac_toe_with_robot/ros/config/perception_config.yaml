@@ -1,13 +1,18 @@
 perception_config:
     board_tiles_roi:
-        tile_0_0: [[  0,   0], [100, 100]]
-        tile_0_1: [[  0, 200], [100, 300]]
-        tile_0_2: [[  0, 400], [100, 500]]
-        tile_1_0: [[150,   0], [250, 100]]
-        tile_1_1: [[150, 200], [250, 300]]
-        tile_1_2: [[150, 400], [250, 500]]
-        tile_2_0: [[300,   0], [400, 100]]
-        tile_2_1: [[300, 200], [400, 300]]
-        tile_2_2: [[300, 400], [400, 500]]
-    trigger_roi: [[0, 0], [100, 100]]
-    inner_square_width: 30
+        tile_0_0: [[195, 275], [230, 315]]
+        tile_0_1: [[195, 335], [230, 375]]
+        tile_0_2: [[195, 395], [230, 430]]
+        tile_1_0: [[250, 275], [290, 315]]
+        tile_1_1: [[250, 335], [290, 375]]
+        tile_1_2: [[250, 395], [290, 440]]
+        tile_2_0: [[310, 275], [350, 315]]
+        tile_2_1: [[310, 335], [350, 375]]
+        tile_2_2: [[310, 395], [350, 440]]
+    trigger_roi: [[125, 335], [160, 375]]
+    inner_square_width: 5
+    min_blk_px_cnt: 200 # minimum num of pixel required to be black for the tile to be non empty
+    min_blk_px_cnt_cross: 30 # minimum num of black pixel required for the inner tile to be cross
+    max_blk_px_cnt_cross: 80 # maximum num of black pixel required for the inner tile to be cross
+    adaptive_threshold_block_size: 75
+    adaptive_threshold_C: 10

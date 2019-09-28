@@ -2,6 +2,7 @@
 <launch>
     <node pkg="tic_tac_toe_with_robot" type="arm_testing.py" name="initialising_arm" output="screen">
         <rosparam command="load" file="$(find tic_tac_toe_with_robot)/ros/config/joint_angles.yaml"/>
+        <rosparam command="load" file="$(find tic_tac_toe_with_robot)/ros/config/perception_config.yaml"/>
     </node>
 </launch>
 

@@ -91,3 +91,19 @@ class Board(object):
         if self.board[0][2] != 0 and self.board[0][2] == self.board[1][1] == self.board[2][0]:
             return self.board[0][2]
         return 0
+
+    def is_valid(self):
+        """Check if board obj is a valid tic tac toe game state
+        :returns: bool
+
+        """
+        player_1_count, player_2_count = 0, 0
+        for i in range(3):
+            player_1_count += self.board[i].count(1)
+            player_2_count += self.board[i].count(2)
+        try:
+            assert player_1_count < 5 and player_2_count < 5
+            assert abs(player_1_count - player_2_count) < 2
+            return True
+        except Exception as e:
+            return False

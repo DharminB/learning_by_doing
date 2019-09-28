@@ -30,7 +30,7 @@ def is_tile_cross(img, roi, centre_width):
     return np.any(gaus_crop == 0)
 
 if __name__ == "__main__":
-    img = cv2.imread('cross.jpg', cv2.IMREAD_GRAYSCALE)
+    # img = cv2.imread('cross.jpg', cv2.IMREAD_GRAYSCALE)
     # print(is_tile_cross(img, (250, 150, 460, 350), 30))
     # print(is_tile_cross('circle.jpg', (250, 150, 460, 350), 30))
 
@@ -38,10 +38,12 @@ if __name__ == "__main__":
     while True:
         time.sleep(0.2)
         ret, frame = cap.read()
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        print(is_tile_cross(gray, (200, 100, 400, 330), 30))
+        img = cv2.flip(frame, flipCode=-1)
+        cv2.imshow('frame', img)
+        # gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        # print(is_tile_cross(gray, (200, 100, 400, 330), 30))
         # print(gray.shape)
-        cv2.imshow('gray', gray)
+        # cv2.imshow('gray', gray)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
