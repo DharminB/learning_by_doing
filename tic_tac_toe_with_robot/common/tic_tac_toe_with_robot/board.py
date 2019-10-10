@@ -102,7 +102,7 @@ class Board(object):
             player_1_count += self.board[i].count(1)
             player_2_count += self.board[i].count(2)
         try:
-            assert player_1_count < 5 and player_2_count < 5
+            assert player_1_count <= 5 and player_2_count <= 5
             assert abs(player_1_count - player_2_count) < 2
             return True
         except Exception as e:

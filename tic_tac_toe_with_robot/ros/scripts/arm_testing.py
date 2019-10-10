@@ -43,7 +43,7 @@ class TicTacToe(object):
         rospy.sleep(1)
         self.audio_pub = rospy.Publisher('/mir_audio_receiver/tts_request', AudioMessage, queue_size=1)
         rospy.sleep(1)
-        # self.setup_arm_for_game()
+        self.setup_arm_for_game()
         self.move_gripper_to('open')
         rospy.sleep(1)
         # self.test_all_poses()
@@ -75,6 +75,22 @@ class TicTacToe(object):
                     continue
             elif state == 'make_a_move':
                 board = self.perceive_valid_board()
+                if board.is_game_complete():
+                    winner = board.get_winner()
+                    rospy.loginfo('Winner: ' + str(winner))
+                    if winner == 1:
+                        for i in range(3):
+                            self.audio_pub.publish(AudioMessage(message='Ha Ha Ha I win'))
+                            rospy.sleep(2)
+                    elif winner == 2:
+                        for i in range(3):
+                            self.audio_pub.publish(AudioMessage(message='Oh no you win'))
+                            rospy.sleep(2)
+                    else:
+                        self.audio_pub.publish(AudioMessage(message='It was a draw. Let us play again'))
+                    state = 'wait_for_new_game_setup'
+                    rospy.loginfo('State change: make_a_move -> wait_for_new_game_setup')
+                    continue
                 ans = AIPlayer.get_best_move(board, 1)
                 rospy.loginfo('My move: ' + str(ans))
                 self.audio_pub.publish(AudioMessage(message='Making my move'))
@@ -110,6 +126,7 @@ class TicTacToe(object):
                     self.audio_pub.publish(AudioMessage(message='Found empty board. New game started.'))
                 else:
                     rospy.logwarn('Please clear the board for new game')
+                    rospy.sleep(3)
                     self.audio_pub.publish(AudioMessage(message='Please clear the board for new game'))
 
     def perceive_valid_board(self):
@@ -118,7 +135,7 @@ class TicTacToe(object):
             rospy.logwarn('Perceived invalid board. Retrying...')
             self.audio_pub.publish(AudioMessage(message='Invalid board found'))
             board = self.perceiver.perceive_board()
-            rospy.sleep(2)
+            rospy.sleep(5)
         return board
 
     def setup_arm_for_game(self):

@@ -13,6 +13,6 @@ perception_config:
     inner_square_width: 5
     min_blk_px_cnt: 200 # minimum num of pixel required to be black for the tile to be non empty
     min_blk_px_cnt_cross: 30 # minimum num of black pixel required for the inner tile to be cross
-    max_blk_px_cnt_cross: 80 # maximum num of black pixel required for the inner tile to be cross
+    max_blk_px_cnt_cross: 200 # maximum num of black pixel required for the inner tile to be cross
     adaptive_threshold_block_size: 75
     adaptive_threshold_C: 10
