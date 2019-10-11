@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<launch>
+    <node pkg="tic_tac_toe_with_robot" type="aruco_tf_pub" name="aruco_tf_pub" output="screen">
+        <param name="calibration_file_path" type="str" value="$(find tic_tac_toe_with_robot)/ros/config/calibration.yaml"/>
+    </node>
+</launch>
+

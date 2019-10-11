@@ -1,0 +1,37 @@
+#! /usr/bin/env python
+
+from __future__ import print_function
+
+import tf
+import sys
+import rospy
+from tic_tac_toe_with_robot.aruco_marker_testing import ArucoMarkerTesting
+
+def main():
+    calibration_file_path = rospy.get_param('~calibration_file_path', None)
+    if calibration_file_path is None:
+        rospy.logfatal('Calibration file path not provided')
+        sys.exit(1)
+    perceiver = ArucoMarkerTesting(calibration_file_path)
+    tf_broadcaster = tf.TransformBroadcaster()
+    pos = [0.16, 0.0, 0.61]
+    orientation = tf.transformations.quaternion_from_euler(-2.7, 0.0, 0.0)
+    rospy.loginfo("Publishing TF...")
+    while not rospy.is_shutdown():
+        tf_broadcaster.sendTransform(pos, orientation, rospy.Time.now(), '/camera', '/table')
+        rospy.sleep(0.1)
+        result = perceiver.get_aruco_marker_and_axis()
+        if result is None:
+            continue
+        ids, corners, rot, trans = result
+        for i in range(ids.shape[0]):
+            marker_id = ids[i][0]
+            rotation = rot[i]
+            translation = trans[i]
+            quat = tf.transformations.quaternion_from_euler(rotation[0][0], -rotation[0][2], rotation[0][1])
+            tf_broadcaster.sendTransform(translation[0], quat, rospy.Time.now(), '/aruco_'+str(marker_id), '/camera')
+    rospy.loginfo("Exiting.")
+
+if __name__ == '__main__' :
+    rospy.init_node('aruco_tf_pub')
+    main()
