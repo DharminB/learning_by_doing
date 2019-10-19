@@ -11,6 +11,10 @@ Changes before launch `mir_bringup` and `mir_moveit_youbot_brsu_1`
   `mir_robots/mir_bringup/robot.launch`
 - [optional] Change from `/dev/input/js0` to `/dev/input/js1` in
   `mir_hardware_config/youbot-brsu-1/config/joy.yaml`
+- Change "EthernetDevice" to "eno1" or something in
+  `youbot_driver/config/youbot-ethercat.cfg`
+- Change "ManipulatorJoint" numbers in
+  `youbot_driver/config/youbot-manipulator.cfg`
 
 ```
 roslaunch mir_bringup robot.launch
