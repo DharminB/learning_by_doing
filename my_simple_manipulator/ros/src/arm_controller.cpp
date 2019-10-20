@@ -6,6 +6,7 @@
 #include <sensor_msgs/JointState.h>
 #include <sensor_msgs/ChannelFloat32.h>
 #include <geometry_msgs/Pose.h>
+#include <std_msgs/Float64.h>
 
 #include <tf/transform_datatypes.h>
 #include <urdf/model.h>
@@ -47,7 +48,7 @@ class ArmController
         double min_vel = 0.001;
 
         ros::NodeHandle nh;
-        ros::Publisher joint_effort_pub;
+        std::vector<ros::Publisher> joint_vel_pubs;
         ros::Subscriber velocity_command_sub;
         ros::Subscriber position_command_sub;
         ros::Subscriber joint_state_sub;
@@ -64,7 +65,7 @@ class ArmController
 
         void jointStateCb(const sensor_msgs::JointState::ConstPtr& msg);
 
-        void fillJointStateMsg();
+        void publishJointVelocity(int joint_index, double joint_vel);
 
         void initialiseJoints();
 
@@ -108,7 +109,12 @@ ArmController::ArmController(int control_rate): nh("~")
     }
 
     /* initialise publisher and subscribers */
-    event_out_pub = nh.advertise<std_msgs::String> ("event_out", 1);
+    for (int i = 0; i < joint_names.size(); i++)
+    {
+        std::string topic_name = "/joint" + std::to_string(i+1) + "_velocity/command";
+        ros::Publisher joint_vel_pub = nh.advertise<std_msgs::Float64> (topic_name, 1);
+        this->joint_vel_pubs.push_back(joint_vel_pub);
+    }
     joint_state_sub = nh.subscribe<sensor_msgs::JointState>
                                         ("/joint_states", 1,
                                          &ArmController::jointStateCb, this);
@@ -122,46 +128,42 @@ ArmController::ArmController(int control_rate): nh("~")
 
 void ArmController::update()
 {
-    /* for (int i = 0; i < this->joint_names.size(); i++) */
-    /* { */
-    /*     if (this->target_joint_positions.size() > 0) */
-    /*     { */
-    /*         double vel = this->position_controllers[i].control(this->current_joint_positions[i], */
-    /*                                                     this->target_joint_positions[i]); */
-    /*         if (vel == 0.0) */
-    /*             this->current_joint_velocities[i] = vel; */
-    /*         else */
-    /*         { */
-    /*             int sign = (vel > 0.0) ? 1 : -1; */
-    /*             this->current_joint_velocities[i] = sign * std::max(this->min_vel, std::min(this->max_vel, fabs(vel))); */
-    /*         } */
-    /*     } */
-    /*     else if (this->target_joint_velocities.size() > 0) */
-    /*     { */
-    /*         this->current_joint_velocities[i] = this->target_joint_velocities[i]; */
-    /*         double future_position = this->current_joint_positions[i] + this->current_joint_velocities[i] / this->control_rate; */
-    /*         if (future_position < this->joint_lower_limits[i] */ 
-    /*                 || future_position > this->joint_upper_limits[i]) */
-    /*         { */
-    /*             ROS_WARN_STREAM("Joint value for " << this->joint_names[i] */
-    /*                             << " is outside limit! Stopping motion."); */
-    /*             this->current_joint_velocities[i] = 0.0; */
-    /*             this->target_joint_velocities[i] = 0.0; */
-    /*             bool all_zero = true; */
-    /*             for (double vel : this->target_joint_velocities) */
-    /*             { */
-    /*                 if (vel != 0.0) { all_zero = false; break; } */
-    /*             } */
-    /*             if (all_zero) */
-    /*                 this->target_joint_velocities.clear(); */
-    /*         } */
-    /*     } */
-    /*     else */
-    /*         break; */
-    /*     this->current_joint_positions[i] += this->current_joint_velocities[i] / this->control_rate; */
-    /* } */
+    bool moved_arm_using_pos_cmd = false;
+    for (int i = 0; i < this->joint_names.size(); i++)
+    {
+        /* std::cout << this->current_joint_positions[i] << std::endl; */
+        if (this->target_joint_positions.size() > 0)
+        {
+            double vel = this->position_controllers[i].control(this->current_joint_positions[i],
+                                                        this->target_joint_positions[i]);
+            double safe_vel;
+            if (vel != 0.0)
+            {
+                int sign = (vel > 0.0) ? 1 : -1;
+                safe_vel = sign * std::max(this->min_vel, std::min(this->max_vel, fabs(vel)));
+                this->publishJointVelocity(i, safe_vel);
+                moved_arm_using_pos_cmd = true;
+            }
+        }
+        if (this->target_joint_velocities.size() > 0)
+            this->publishJointVelocity(i, this->target_joint_velocities[i]);
 
-    /* this->fillJointStateMsg(); */
+        /* safety condition */
+        double future_position = this->current_joint_positions[i] + this->current_joint_velocities[i] / this->control_rate;
+        if (future_position < this->joint_lower_limits[i] 
+                || future_position > this->joint_upper_limits[i])
+        {
+            ROS_WARN_STREAM("Joint value for " << this->joint_names[i]
+                            << " is outside limit! Stopping motion.");
+            this->publishJointVelocity(i, 0.0);
+        }
+    }
+    if (this->target_joint_velocities.size() > 0)
+        this->target_joint_velocities.clear();
+
+    if (this->target_joint_positions.size() > 0 && !moved_arm_using_pos_cmd)
+        this->target_joint_positions.clear();
+
     /* /1* ROS_INFO_STREAM(this->joint_state_msg); *1/ */
     
     /* joint_state_msg.header.stamp = ros::Time::now(); */
@@ -170,7 +172,18 @@ void ArmController::update()
 
 void ArmController::jointStateCb(const sensor_msgs::JointState::ConstPtr& msg)
 {
-    ROS_INFO_STREAM(*msg);
+    /* ROS_INFO_STREAM(*msg); */
+    if (msg->name.size() != this->joint_names.size())
+    {
+        ROS_WARN_STREAM("Number of joints mismatch! Expecting " 
+                        << this->joint_names.size() << " values.");
+        return;
+    }
+    for (int i = 0; i < msg->position.size(); i++)
+    {
+        this->current_joint_positions[i] = msg->position[i];
+        this->current_joint_velocities[i] = msg->velocity[i];
+    }
 }
 
 void ArmController::positionCommandCb(const sensor_msgs::ChannelFloat32::ConstPtr& msg)
@@ -239,13 +252,12 @@ void ArmController::velocityCommandCb(const sensor_msgs::ChannelFloat32::ConstPt
     }
 }
 
-void ArmController::fillJointStateMsg()
+void ArmController::publishJointVelocity(int joint_index, double joint_vel)
 {
-    for (int i = 0; i < this->joint_names.size(); i++)
-    {
-        this->joint_state_msg.position[i] = this->current_joint_positions[i];
-        this->joint_state_msg.velocity[i] = this->current_joint_velocities[i];
-    }
+    std_msgs::Float64 msg;
+    msg.data = joint_vel;
+    this->joint_vel_pubs[joint_index].publish(msg);
+    /* std::cout << joint_index << " " << joint_vel << std::endl; */
 }
 
 void ArmController::initialiseJoints()
