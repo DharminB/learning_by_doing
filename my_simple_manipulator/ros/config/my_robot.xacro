@@ -10,9 +10,9 @@
     <xacro:property name="link3_radius" value="0.02" />
     <xacro:property name="link1_mass" value="1.0" />
     <xacro:property name="link2_mass" value="0.6" />
-    <xacro:property name="link3_mass" value="0.4" />
+    <xacro:property name="link3_mass" value="0.2" />
     <xacro:property name="base_mass" value="10.0" />
-    <xacro:property name="ee_mass" value="0.2" />
+    <xacro:property name="ee_mass" value="0.02" />
 
     <!-- collision_shortening_factor -->
     <xacro:property name="csf" value="0.8" /> 
@@ -97,7 +97,7 @@
         <child link="link1"/>
         <origin xyz="0 0 0.05" rpy="0 0 0.0" />
         <axis xyz="0 0 1" />
-        <limit effort="30" velocity="1.0" lower="-3.13" upper="3.13"/>
+        <limit effort="300" velocity="1.0" lower="-3.13" upper="3.13"/>
     </joint>
 
     <link name="link1">
@@ -129,7 +129,7 @@
         <child link="link2"/>
         <origin xyz="0 0 ${link1_length}" rpy="1.57 -1.57 0.0" />
         <axis xyz="0 0 1" />
-        <limit effort="30" velocity="1.0" lower="-2.13" upper="2.13"/>
+        <limit effort="300" velocity="1.0" lower="-2.13" upper="2.13"/>
     </joint>
 
     <link name="link2">
@@ -161,7 +161,7 @@
         <child link="link3"/>
         <origin xyz="${link2_length} 0.0 0.0" rpy="0 0 0.0" />
         <axis xyz="0 0 1" />
-        <limit effort="30" velocity="1.0" lower="-2.00" upper="2.00"/>
+        <limit effort="300" velocity="1.0" lower="-2.00" upper="2.00"/>
     </joint>
 
     <link name="link3">
@@ -208,6 +208,7 @@
     <transmission name="joint1_trans">
         <type>transmission_interface/SimpleTransmission</type>
         <actuator name="$joint1_motor">
+            <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
             <mechanicalReduction>1</mechanicalReduction>
         </actuator>
         <joint name="joint1">
@@ -218,6 +219,7 @@
     <transmission name="joint2_trans">
         <type>transmission_interface/SimpleTransmission</type>
         <actuator name="$joint2_motor">
+            <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
             <mechanicalReduction>1</mechanicalReduction>
         </actuator>
         <joint name="joint2">
@@ -228,6 +230,7 @@
     <transmission name="joint3_trans">
         <type>transmission_interface/SimpleTransmission</type>
         <actuator name="$joint3_motor">
+            <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
             <mechanicalReduction>1</mechanicalReduction>
         </actuator>
         <joint name="joint3">

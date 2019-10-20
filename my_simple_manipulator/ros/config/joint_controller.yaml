@@ -21,4 +21,4 @@ joint2_velocity:
 joint3_velocity:
     type: "effort_controllers/JointVelocityController"
     joint: joint3
-    pid: {p: 10.0, i: 0.1, d: 0.0}
+    pid: {p: 4.0, i: 100.0, d: 0.0005, i_clamp_min: -1000.0, i_clamp_max: 1000.0}
