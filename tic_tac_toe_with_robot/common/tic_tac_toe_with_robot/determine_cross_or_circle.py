@@ -81,26 +81,25 @@ def contours(img):
     indexes = filter(lambda x: 50 <cv2.contourArea(contours[x]) < 600, range(len(contours)))
     contour_img = img.copy()
     # contour_img = cv2.drawContours(contour_img, contours, -1, (0, 255, 0), 1)
-    # print(len(contours))
     for cnt in contours[:]:
         if cnt.shape[0] < 10:
             continue
         ellipse = cv2.fitEllipse(cnt)
         # print(ellipse)
-        if abs(ellipse[1][0] - ellipse[1][1]) < 4 and 15 < ellipse[1][0] < 30:
+        if abs(ellipse[1][0] - ellipse[1][1]) < 4 and 30 < ellipse[1][0] < 50:
             rms_error = 0
             radius = (ellipse[1][0] + ellipse[1][0])/4
             for pt in cnt:
                 rms_error += abs(np.linalg.norm(pt - ellipse[0]) - radius)
             avg_rms_error = rms_error/cnt.shape[0]
-            # print(avg_rms_error)
-            if avg_rms_error < 2:
+            print(avg_rms_error)
+            if avg_rms_error < 4:
                 cv2.circle(contour_img, tuple(map(int, ellipse[0])), 5, (0, 0, 255), -1)
                 # font = cv2.FONT_HERSHEY_SIMPLEX
                 # cv2.putText(img, "hello", (0,130), font, 1, (200, 255, 255), 2, cv2.LINE_AA)
                 contour_img = cv2.ellipse(contour_img, ellipse, (255, 255, 255), 3)
-        # else:
-        #     contour_img = cv2.ellipse(contour_img, ellipse, (0, 255, 255), 1)
+        else:
+            contour_img = cv2.ellipse(contour_img, ellipse, (0, 255, 255), 1)
 
     # M = cv2.moments(cnt)
     # centroid = (int(M['m10']/M['m00']), int(M['m01']/M['m00']))

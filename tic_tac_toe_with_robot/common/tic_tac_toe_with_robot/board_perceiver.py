@@ -8,6 +8,7 @@ import random
 import numpy as np
 
 from tic_tac_toe_with_robot.board import Board
+from tic_tac_toe_with_robot.homography import get_tiles
 
 class BoardPerceiver(object):
 
@@ -26,7 +27,7 @@ class BoardPerceiver(object):
 
     def __del__(self):
         self.video_feed.release()
-        cv2.destroyAllWindows()
+        # cv2.destroyAllWindows()
 
     def perceive_board(self):
         """Main function to perceive board
@@ -36,12 +37,15 @@ class BoardPerceiver(object):
         for i in range(4):
             self.video_feed.grab()
         ret, frame = self.video_feed.read()
-        rotated_frame = cv2.flip(frame, flipCode=-1)
-        gray_full = cv2.cvtColor(rotated_frame, cv2.COLOR_BGR2GRAY)
+        gray_full = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         if self.debug:
             cv2.imshow('gray_full', gray_full)
 
-        tiles = self._get_all_tiles(gray_full)
+        # tiles = self._get_all_tiles(gray_full)
+        ideal_ids = np.array([11, 3, 7, 10])
+        tiles = get_tiles(gray_full, ideal_ids=ideal_ids)
+        if tiles is None:
+            return None
         board_list = [[0, 0, 0], [0, 0, 0], [0, 0, 0]]
         for i in range(3):
             for j in range(3):
@@ -50,7 +54,7 @@ class BoardPerceiver(object):
         valid = board.is_valid()
 
         if self.visualise:
-            self._visualise_board_on_img(gray_full, board, tiles)
+            self._visualise_board_on_img(board, tiles)
             # cv2.waitKey(0)
             # cv2.destroyAllWindows()
 
@@ -68,8 +72,7 @@ class BoardPerceiver(object):
         for i in range(4):
             self.video_feed.grab()
         ret, frame = self.video_feed.read()
-        rotated_frame = cv2.flip(frame, flipCode=-1)
-        gray_full = cv2.cvtColor(rotated_frame, cv2.COLOR_BGR2GRAY)
+        gray_full = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         if self.debug:
             cv2.imshow('gray_full', gray_full)
             cv2.waitKey(1)
@@ -88,22 +91,6 @@ class BoardPerceiver(object):
         # cv2.destroyAllWindows()
         return False
 
-    def _get_all_tiles(self, full_img):
-        """Gets all the cropped tile images of tic tac toe board based on the config
-
-        :full_img: cv2.Image
-        :returns: TODO
-
-        """
-        tiles = [[0, 0, 0], [0, 0, 0], [0, 0, 0]]
-        for i in range(3):
-            for j in range(3):
-                roi = self.perception_config['board_tiles_roi']['tile_'+str(i)+'_'+str(j)]
-                tiles[i][j] = full_img[roi[0][0]:roi[1][0], roi[0][1]:roi[1][1]]
-                # if self.debug:
-                #     cv2.imshow('tile_'+str(i) + '_' + str(j), tiles[i][j])
-        return tiles
-        
     def _determine_tile_type(self, img, name=''):
         """Determine if `img` represents a cross, a circle or an empty tile
            Returns 0 for empty, 1 for cross and 2 for circle
@@ -115,19 +102,26 @@ class BoardPerceiver(object):
         gaus_mask = self.get_adaptive_threshold(img)
         if self.debug:
             cv2.imshow('frame'+name, gaus_mask)
-            print(name)
-            print('black_px_cnt', np.count_nonzero(gaus_mask == 0))
         if np.count_nonzero(gaus_mask == 0) < self.perception_config['min_blk_px_cnt']:
             return 0
+        return 2 if self._is_circle(gaus_mask) else 1
 
-        height, width = gaus_mask.shape
-        w = self.perception_config['inner_square_width']
-        gaus_crop = gaus_mask[height/2-w : height/2+w,   width/2-w : width/2+w]
-        if self.debug:
-            cv2.imshow('gaus_crop'+name, gaus_crop)
-            print('black_px_cnt_cross', np.count_nonzero(gaus_crop == 0))
-        return 1 if self.perception_config['min_blk_px_cnt_cross'] < np.count_nonzero(gaus_crop == 0) < self.perception_config['max_blk_px_cnt_cross'] else 2
-        # return 1 if np.any(gaus_crop == 0) else 2
+    def _is_circle(self, img):
+        bw_img = cv2.bitwise_not(img)
+        _, contours, hierarchy = cv2.findContours(bw_img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        for cnt in contours[:]:
+            if cnt.shape[0] < 10:
+                continue
+            ellipse = cv2.fitEllipse(cnt)
+            if abs(ellipse[1][0] - ellipse[1][1]) < 4 and 30 < ellipse[1][0] < 50:
+                rms_error = 0
+                radius = (ellipse[1][0] + ellipse[1][0])/4
+                for pt in cnt:
+                    rms_error += abs(np.linalg.norm(pt - ellipse[0]) - radius)
+                avg_rms_error = rms_error/cnt.shape[0]
+                if avg_rms_error < 4:
+                    return True
+        return False
 
     def get_adaptive_threshold(self, img):
         return cv2.adaptiveThreshold(img,
@@ -137,31 +131,33 @@ class BoardPerceiver(object):
                                      self.perception_config['adaptive_threshold_block_size'],
                                      self.perception_config['adaptive_threshold_C'])
 
-    def _visualise_board_on_img(self, img, board, tiles):
+    def _visualise_board_on_img(self, board, tiles):
         """Overlap board visualisation on img
 
-        :img: cv2.Image
         :board: Board
-        :tiles: list of list of cv2.Image
+        :tiles: list of list of cv2.Image (size 3x3)
         :returns: None
 
         """
-        visualised_img = img.copy()
+        tile_size = tiles[0][0].shape[0]
+        image_size = int(3.2*tile_size)
+        visualised_img = np.zeros((image_size, image_size), np.uint8)
         for i in range(3):
             for j in range(3):
-                roi = self.perception_config['board_tiles_roi']['tile_'+str(i)+'_'+str(j)]
-                # print(roi)
-                visualised_img[roi[0][0]:roi[1][0], roi[0][1]:roi[1][1]] = self.get_adaptive_threshold(tiles[i][j])
-                # cv2.imshow(str(i)+str(j), tiles[i][j])
+                start_pt_x = int(1.1 * i * tile_size)
+                end_pt_x = int(((1.1*i) + 1) * tile_size)
+                start_pt_y = int(1.1 * j * tile_size)
+                end_pt_y = int(((1.1*j) + 1) * tile_size)
+                visualised_img[start_pt_x:end_pt_x, start_pt_y:end_pt_y] = self.get_adaptive_threshold(tiles[i][j])
                 if board.board[i][j] == 1:
-                    cv2.line(visualised_img, tuple(roi[0][::-1]), tuple(roi[1][::-1]), 127, 2)
-                
-                if board.board[i][j] == 0:
-                    cv2.rectangle(visualised_img, tuple(roi[0][::-1]), tuple(roi[1][::-1]), 127, 2)
+                    cv2.line(visualised_img, (start_pt_x, start_pt_y), (end_pt_x, end_pt_y), 127, 5)
+                    cv2.line(visualised_img, (start_pt_x, end_pt_y), (end_pt_x, start_pt_y), 127, 5)
                 
                 if board.board[i][j] == 2:
-                    # print((roi[0][0]+roi[1][0])/2,(roi[0][1]+roi[1][1])/2)
-                    cv2.circle(visualised_img, ((roi[0][1]+roi[1][1])/2,(roi[0][0]+roi[1][0])/2), (roi[1][1]-roi[0][1])/2, 127, 2)
+                    cv2.circle(visualised_img,
+                               (start_pt_y+int(tile_size/2), start_pt_x+int(tile_size/2)),
+                               int(tile_size/2), 127, 4)
+                    # cv2.circle(visualised_img, (start_pt_x+int(tile_size/2), start_pt_y+int(tile_size/2)), (end_pt_x-start_pt_x)/2, 127, 2)
         # cv2.imshow(str(i)+str(j), tiles[i][j])
         cv2.imshow('visualised', visualised_img)
         cv2.waitKey(1)
@@ -192,23 +188,6 @@ def get_perception_config(file_name):
     return perception_config['perception_config']
 
 if __name__ == "__main__":
-    # img = cv2.imread('cross.jpg', cv2.IMREAD_GRAYSCALE)
-    # print(is_tile_cross(img, (250, 150, 460, 350), 30))
-    # print(is_tile_cross('circle.jpg', (250, 150, 460, 350), 30))
-
-    # cap = cv2.VideoCapture(1)
-    # while True:
-    #     time.sleep(0.2)
-    #     ret, frame = cap.read()
-    #     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    #     print(is_tile_cross(gray, (200, 100, 400, 330), 30))
-    #     # print(gray.shape)
-    #     cv2.imshow('gray', gray)
-
-    #     if cv2.waitKey(1) & 0xFF == ord('q'):
-    #         break
-    # cap.release()
-    # cv2.destroyAllWindows()
     PERCEPTION_CONFIG = get_perception_config('perception_config.yaml')
     PERCEIVER = BoardPerceiver(PERCEPTION_CONFIG)
     # board = PERCEIVER.perceive_board()
