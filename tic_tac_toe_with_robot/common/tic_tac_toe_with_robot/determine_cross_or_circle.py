@@ -96,6 +96,8 @@ def contours(img):
             # print(avg_rms_error)
             if avg_rms_error < 2:
                 cv2.circle(contour_img, tuple(map(int, ellipse[0])), 5, (0, 0, 255), -1)
+                # font = cv2.FONT_HERSHEY_SIMPLEX
+                # cv2.putText(img, "hello", (0,130), font, 1, (200, 255, 255), 2, cv2.LINE_AA)
                 contour_img = cv2.ellipse(contour_img, ellipse, (255, 255, 255), 3)
         # else:
         #     contour_img = cv2.ellipse(contour_img, ellipse, (0, 255, 255), 1)
@@ -112,7 +114,7 @@ def contours(img):
 
 if __name__ == "__main__":
     # video_feed = cv2.VideoCapture(1)
-    video_feed = cv2.VideoCapture('/home/dharmin/Downloads/01.avi')
+    video_feed = cv2.VideoCapture('/home/dharmin/Videos/03.avi')
     while video_feed.isOpened():
         time.sleep(0.2)
         ret, frame = video_feed.read()

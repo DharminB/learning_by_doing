@@ -10,11 +10,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
-CAMERA_MAT = None
-DIST_COEFF = None
-MARKER_SIZE = 0.04
-ARUCO_DICT = cv2.aruco.Dictionary_get(cv2.aruco.DICT_4X4_50)
-
 class ArucoMarkerTesting(object):
     def __init__(self, calibration_file_path):
         self.video_feed = cv2.VideoCapture(1)
@@ -60,6 +55,7 @@ def get_path_from_name(file_name):
 def main():
     calibration_file_path = get_path_from_name('calibration.yaml')
     amt = ArucoMarkerTesting(calibration_file_path)
+    print("\nPress Ctrl+c to exit\n")
     while True:
         time.sleep(0.1)
         result = amt.get_aruco_marker_and_axis(visualise=True)
