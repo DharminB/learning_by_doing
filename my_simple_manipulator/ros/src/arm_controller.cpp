@@ -5,7 +5,7 @@
 
 #include <sensor_msgs/JointState.h>
 #include <sensor_msgs/ChannelFloat32.h>
-#include <geometry_msgs/Pose.h>
+#include <geometry_msgs/PointStamped.h>
 #include <std_msgs/Float64.h>
 
 #include <tf/transform_datatypes.h>
@@ -31,6 +31,7 @@ class ArmController
         std::vector<std::string> joint_names;
         std::vector<double> joint_lower_limits;
         std::vector<double> joint_upper_limits;
+        KDL::ChainFkSolverPos_recursive *fk_solver;
 
         std::vector<double> target_joint_positions;
         std::vector<double> target_joint_velocities;
@@ -49,8 +50,9 @@ class ArmController
 
         ros::NodeHandle nh;
         std::vector<ros::Publisher> joint_vel_pubs;
-        ros::Subscriber velocity_command_sub;
+        ros::Subscriber point_command_sub;
         ros::Subscriber position_command_sub;
+        ros::Subscriber velocity_command_sub;
         ros::Subscriber joint_state_sub;
 
         /*
@@ -59,11 +61,15 @@ class ArmController
          */
         std::string getEndEffector(KDL::Tree tree);
 
+        void pointCommandCb(const geometry_msgs::PointStamped::ConstPtr& msg);
+
         void positionCommandCb(const sensor_msgs::ChannelFloat32::ConstPtr& msg);
 
         void velocityCommandCb(const sensor_msgs::ChannelFloat32::ConstPtr& msg);
 
         void jointStateCb(const sensor_msgs::JointState::ConstPtr& msg);
+
+        bool getIK(double x, double y, double z, std::vector<double> &joint_positions);
 
         void publishJointVelocity(int joint_index, double joint_vel);
 
@@ -100,6 +106,10 @@ ArmController::ArmController(int control_rate): nh("~")
     /* get the names and limits of all joints */
     initialiseJoints();
 
+    /* initialise forward kinematic solver */
+    KDL::ChainFkSolverPos_recursive temp_fk_solver(this->my_chain);
+    this->fk_solver = &temp_fk_solver;
+
     /* create template message with zero joint angles */
     joint_state_msg.name = joint_names;
     for (int i = 0; i < joint_names.size(); i++)
@@ -118,12 +128,20 @@ ArmController::ArmController(int control_rate): nh("~")
     joint_state_sub = nh.subscribe<sensor_msgs::JointState>
                                         ("/joint_states", 1,
                                          &ArmController::jointStateCb, this);
+    point_command_sub = nh.subscribe<geometry_msgs::PointStamped>
+                                        ("point_command", 1,
+                                         &ArmController::pointCommandCb, this);
     position_command_sub = nh.subscribe<sensor_msgs::ChannelFloat32>
                                         ("position_command", 1,
                                          &ArmController::positionCommandCb, this);
     velocity_command_sub = nh.subscribe<sensor_msgs::ChannelFloat32>
                                         ("velocity_command", 1,
                                          &ArmController::velocityCommandCb, this);
+
+    /* bool success = this->getIK(0.84, 0.0, 0.989); */
+    /* std::cout << success << std::endl; */
+    /* bool status2 = this->getIK(1.0, 0.0, 1.0); */
+    /* std::cout << status2 << std::endl; */
 }
 
 void ArmController::update()
@@ -164,10 +182,7 @@ void ArmController::update()
     if (this->target_joint_positions.size() > 0 && !moved_arm_using_pos_cmd)
         this->target_joint_positions.clear();
 
-    /* /1* ROS_INFO_STREAM(this->joint_state_msg); *1/ */
-    
-    /* joint_state_msg.header.stamp = ros::Time::now(); */
-    /* joint_state_pub.publish(joint_state_msg); */
+    /* ROS_INFO_STREAM(this->joint_state_msg); */
 }
 
 void ArmController::jointStateCb(const sensor_msgs::JointState::ConstPtr& msg)
@@ -184,6 +199,35 @@ void ArmController::jointStateCb(const sensor_msgs::JointState::ConstPtr& msg)
         this->current_joint_positions[i] = msg->position[i];
         this->current_joint_velocities[i] = msg->velocity[i];
     }
+}
+
+void ArmController::pointCommandCb(const geometry_msgs::PointStamped::ConstPtr& msg)
+{
+    ROS_INFO_STREAM(*msg);
+    if (msg->header.frame_id != "base_link")
+    {
+        ROS_WARN_STREAM("Frame should be base_link. Ignoring.");
+        return;
+    }
+    std::cout << "in here" << std::endl;
+    /* std::vector<double> joint_pos; */
+    bool success = this->getIK(msg->point.x, msg->point.y, msg->point.z, this->target_joint_positions);
+    if (success)
+    {
+        /* for (double i : joint_pos) */
+        /*     std::cout << i << std::endl; */
+    }
+    /* KDL::JntArray joint_pos(my_chain.getNrOfJoints()); */
+    /* for (int i = 0; i < joint_pos.rows(); i++) */
+    /* { */
+    /*     std::cout << joint_pos(i) << std::endl; */
+    /* } */
+    /* KDL::Frame cart_pos; */
+    /* fk_solver.JntToCart(joint_pos, cart_pos); */
+
+    /* geometry_msgs::Pose pose; */
+    /* tf::poseKDLToMsg(cart_pos, pose); */
+    /* ROS_INFO_STREAM(pose); */
 }
 
 void ArmController::positionCommandCb(const sensor_msgs::ChannelFloat32::ConstPtr& msg)
@@ -250,6 +294,25 @@ void ArmController::velocityCommandCb(const sensor_msgs::ChannelFloat32::ConstPt
         this->target_joint_velocities.push_back(msg->values[i]);
         this->position_controllers[i].reset();
     }
+}
+
+bool ArmController::getIK(double x, double y, double z, std::vector<double> &joint_positions)
+{
+    KDL::ChainIkSolverPos_LMA temp_ik_solver(this->my_chain);
+    KDL::JntArray init_joint_pos(my_chain.getNrOfJoints());
+    KDL::JntArray final_joint_pos(my_chain.getNrOfJoints());
+    KDL::Frame ee_pose(KDL::Vector(x, y, z));
+    std::cout << ee_pose.p.x() << " " << ee_pose.p.y() << " " << ee_pose.p.z() << std::endl;
+    int ret = temp_ik_solver.CartToJnt(init_joint_pos, ee_pose, final_joint_pos);
+    if (ret < 0 && ret > -100)
+        return false;
+    for (int i = 0; i < final_joint_pos.rows(); i++)
+    {
+        /* std::cout << final_joint_pos(i) << std::endl; */
+        joint_positions.push_back(final_joint_pos(i));
+    }
+
+    return true;
 }
 
 void ArmController::publishJointVelocity(int joint_index, double joint_vel)
