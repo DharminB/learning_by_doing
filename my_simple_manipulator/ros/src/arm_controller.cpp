@@ -18,8 +18,11 @@
 #include <kdl_conversions/kdl_msg.h>
 #include <kdl/chainfksolverpos_recursive.hpp>
 #include <kdl/chainiksolverpos_lma.hpp>
+#include <kdl/chainiksolverpos_nr_jl.hpp>
+#include <kdl/chainiksolvervel_pinv.hpp>
 
 #include <pid_controller.cpp>
+#include <kinematics.cpp>
 
 class ArmController
 {
@@ -31,7 +34,9 @@ class ArmController
         std::vector<std::string> joint_names;
         std::vector<double> joint_lower_limits;
         std::vector<double> joint_upper_limits;
-        KDL::ChainFkSolverPos_recursive *fk_solver;
+        /* KDL::ChainFkSolverPos_recursive *fk_solver; */
+        /* KDL::ChainIkSolverPos_NR_JL *ik_solver; */
+        Kinematics kinematics;
 
         std::vector<double> target_joint_positions;
         std::vector<double> target_joint_velocities;
@@ -59,7 +64,7 @@ class ArmController
          * get the name of the segment which has no children
          * Assumption: manipulator has single chain. No segment has more than 1 child
          */
-        std::string getEndEffector(KDL::Tree tree);
+        /* std::string getEndEffector(KDL::Tree tree); */
 
         void pointCommandCb(const geometry_msgs::PointStamped::ConstPtr& msg);
 
@@ -69,46 +74,26 @@ class ArmController
 
         void jointStateCb(const sensor_msgs::JointState::ConstPtr& msg);
 
-        bool getIK(double x, double y, double z, std::vector<double> &joint_positions);
+        /* bool getIK(double x, double y, double z, std::vector<double> &joint_positions); */
 
         void publishJointVelocity(int joint_index, double joint_vel);
 
         void initialiseJoints();
 
     public:
-        ArmController(int control_rate);
+        ArmController(KDL::Chain &chain, int control_rate);
         void update();
 };
 
-ArmController::ArmController(int control_rate): nh("~")
+ArmController::ArmController(KDL::Chain &chain, int control_rate):
+    nh("~"),
+    my_chain(chain),
+    kinematics(chain)
 {
     this->control_rate = control_rate;
-    KDL::Tree my_tree;
-    if (!kdl_parser::treeFromParam("/robot_description", my_tree))
-    {
-        ROS_ERROR("Failed to construct kdl tree. Exiting.");
-        exit(1);
-    }
-
-    /* create chain from tree */
-    std::string base_name = my_tree.getRootSegment()->first;
-    std::string ee_name = getEndEffector(my_tree);
-
-    if (!my_tree.getChain(base_name, ee_name, my_chain))
-    {
-        ROS_ERROR("Failed to construct chain from tree. Exiting.");
-        exit(1);
-    }
-
-    ROS_INFO_STREAM("Successfully created kdl chain");
-    std::cout << my_chain.getNrOfJoints() << " joints found." << std::endl;
 
     /* get the names and limits of all joints */
     initialiseJoints();
-
-    /* initialise forward kinematic solver */
-    KDL::ChainFkSolverPos_recursive temp_fk_solver(this->my_chain);
-    this->fk_solver = &temp_fk_solver;
 
     /* create template message with zero joint angles */
     joint_state_msg.name = joint_names;
@@ -138,10 +123,10 @@ ArmController::ArmController(int control_rate): nh("~")
                                         ("velocity_command", 1,
                                          &ArmController::velocityCommandCb, this);
 
-    /* bool success = this->getIK(0.84, 0.0, 0.989); */
-    /* std::cout << success << std::endl; */
-    /* bool status2 = this->getIK(1.0, 0.0, 1.0); */
-    /* std::cout << status2 << std::endl; */
+    std::vector<double> joints({0.0, 1.0, 0.0});
+    double x, y, z;
+    this->kinematics.findFK(joints, x, y, z);
+    std::cout << x << " " << y << " " << z << std::endl;
 }
 
 void ArmController::update()
@@ -211,12 +196,14 @@ void ArmController::pointCommandCb(const geometry_msgs::PointStamped::ConstPtr& 
     }
     std::cout << "in here" << std::endl;
     /* std::vector<double> joint_pos; */
-    bool success = this->getIK(msg->point.x, msg->point.y, msg->point.z, this->target_joint_positions);
-    if (success)
-    {
+    /* bool success = this->getIK(msg->point.x, msg->point.y, msg->point.z, this->target_joint_positions); */
+    /* if (success) */
+    /* { */
         /* for (double i : joint_pos) */
         /*     std::cout << i << std::endl; */
-    }
+    /* } */
+    /* else */
+    /*     ROS_WARN_STREAM("Could not find a valid IK solution!"); */
     /* KDL::JntArray joint_pos(my_chain.getNrOfJoints()); */
     /* for (int i = 0; i < joint_pos.rows(); i++) */
     /* { */
@@ -296,24 +283,33 @@ void ArmController::velocityCommandCb(const sensor_msgs::ChannelFloat32::ConstPt
     }
 }
 
-bool ArmController::getIK(double x, double y, double z, std::vector<double> &joint_positions)
-{
-    KDL::ChainIkSolverPos_LMA temp_ik_solver(this->my_chain);
-    KDL::JntArray init_joint_pos(my_chain.getNrOfJoints());
-    KDL::JntArray final_joint_pos(my_chain.getNrOfJoints());
-    KDL::Frame ee_pose(KDL::Vector(x, y, z));
-    std::cout << ee_pose.p.x() << " " << ee_pose.p.y() << " " << ee_pose.p.z() << std::endl;
-    int ret = temp_ik_solver.CartToJnt(init_joint_pos, ee_pose, final_joint_pos);
-    if (ret < 0 && ret > -100)
-        return false;
-    for (int i = 0; i < final_joint_pos.rows(); i++)
-    {
-        /* std::cout << final_joint_pos(i) << std::endl; */
-        joint_positions.push_back(final_joint_pos(i));
-    }
+/* bool ArmController::getIK(double x, double y, double z, std::vector<double> &joint_positions) */
+/* { */
+/*     /1* KDL::ChainIkSolverPos_LMA temp_ik_solver(this->my_chain); *1/ */
+/*     KDL::JntArray init_joint_pos(my_chain.getNrOfJoints()); */
+/*     KDL::JntArray final_joint_pos(my_chain.getNrOfJoints()); */
+/*     /1* KDL::Frame ee_pose(KDL::Rotation(0.84, -0.53, -0.0013, -0.0013, 0.00039, -0.99, -0.53, 0.84, 0.00039), KDL::Vector(x, y, z)); *1/ */
+/*     KDL::Frame ee_pose(KDL::Rotation(0.84, -0.0013, -0.53, -0.53, 0.00039, 0.84, -0.0013, -0.99, 0.00039), KDL::Vector(x, y, z)); */
+/*     /1* KDL::Frame ee_pose(KDL::Vector(x, y, z)); *1/ */
 
-    return true;
-}
+/*     geometry_msgs::Pose pose; */
+/*     tf::poseKDLToMsg(ee_pose, pose); */
+/*     ROS_INFO_STREAM(pose); */
+
+/*     std::cout << ee_pose.p.x() << " " << ee_pose.p.y() << " " << ee_pose.p.z() << std::endl; */
+/*     /1* int ret = temp_ik_solver.CartToJnt(init_joint_pos, ee_pose, final_joint_pos); *1/ */
+/*     /1* int ret = this->ik_solver->CartToJnt(init_joint_pos, ee_pose, final_joint_pos); *1/ */
+/*     std::cout << ret << std::endl; */
+/*     if (ret < 0 && ret > -100) */
+/*         return false; */
+/*     for (int i = 0; i < final_joint_pos.rows(); i++) */
+/*     { */
+/*         /1* std::cout << final_joint_pos(i) << std::endl; *1/ */
+/*         joint_positions.push_back(final_joint_pos(i)); */
+/*     } */
+
+/*     return true; */
+/* } */
 
 void ArmController::publishJointVelocity(int joint_index, double joint_vel)
 {
@@ -371,7 +367,7 @@ void ArmController::initialiseJoints()
     }
 }
 
-std::string ArmController::getEndEffector(KDL::Tree tree)
+std::string getEndEffector(KDL::Tree tree)
 {
     std::string end_effector_name;
     KDL::SegmentMap sm = tree.getSegments();
@@ -390,8 +386,28 @@ std::string ArmController::getEndEffector(KDL::Tree tree)
 int main(int argc, char *argv[])
 {
     ros::init(argc, argv, "arm_controller");
+    KDL::Tree my_tree;
+    if (!kdl_parser::treeFromParam("/robot_description", my_tree))
+    {
+        ROS_ERROR("Failed to construct kdl tree. Exiting.");
+        exit(1);
+    }
+
+    /* create chain from tree */
+    std::string base_name = my_tree.getRootSegment()->first;
+    std::string ee_name = getEndEffector(my_tree);
+
+    KDL::Chain my_chain;
+    if (!my_tree.getChain(base_name, ee_name, my_chain))
+    {
+        ROS_ERROR("Failed to construct chain from tree. Exiting.");
+        exit(1);
+    }
+
+    ROS_INFO_STREAM("Successfully created kdl chain");
+    std::cout << my_chain.getNrOfJoints() << " joints found." << std::endl;
     int control_rate = 10;
-    ArmController arm_controller(control_rate);
+    ArmController arm_controller(my_chain, control_rate);
 
     ros::Rate rate(control_rate);
     while (ros::ok())
