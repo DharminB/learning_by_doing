@@ -123,10 +123,11 @@ ArmController::ArmController(KDL::Chain &chain, int control_rate):
                                         ("velocity_command", 1,
                                          &ArmController::velocityCommandCb, this);
 
-    std::vector<double> joints({0.0, 1.0, 0.0});
-    double x, y, z;
-    this->kinematics.findFK(joints, x, y, z);
-    std::cout << x << " " << y << " " << z << std::endl;
+    this->kinematics.setJointLimits(this->joint_lower_limits, this->joint_upper_limits);
+    /* std::vector<double> joints({0.0, 1.0, 0.0}); */
+    /* double x, y, z; */
+    /* this->kinematics.findFK(joints, x, y, z); */
+    /* std::cout << x << " " << y << " " << z << std::endl; */
 }
 
 void ArmController::update()
@@ -165,7 +166,10 @@ void ArmController::update()
         this->target_joint_velocities.clear();
 
     if (this->target_joint_positions.size() > 0 && !moved_arm_using_pos_cmd)
+    {
         this->target_joint_positions.clear();
+        std::cout << "Reached target position" << std::endl;
+    }
 
     /* ROS_INFO_STREAM(this->joint_state_msg); */
 }
@@ -194,27 +198,19 @@ void ArmController::pointCommandCb(const geometry_msgs::PointStamped::ConstPtr& 
         ROS_WARN_STREAM("Frame should be base_link. Ignoring.");
         return;
     }
-    std::cout << "in here" << std::endl;
-    /* std::vector<double> joint_pos; */
-    /* bool success = this->getIK(msg->point.x, msg->point.y, msg->point.z, this->target_joint_positions); */
-    /* if (success) */
-    /* { */
-        /* for (double i : joint_pos) */
-        /*     std::cout << i << std::endl; */
-    /* } */
-    /* else */
-    /*     ROS_WARN_STREAM("Could not find a valid IK solution!"); */
-    /* KDL::JntArray joint_pos(my_chain.getNrOfJoints()); */
-    /* for (int i = 0; i < joint_pos.rows(); i++) */
-    /* { */
-    /*     std::cout << joint_pos(i) << std::endl; */
-    /* } */
-    /* KDL::Frame cart_pos; */
-    /* fk_solver.JntToCart(joint_pos, cart_pos); */
-
-    /* geometry_msgs::Pose pose; */
-    /* tf::poseKDLToMsg(cart_pos, pose); */
-    /* ROS_INFO_STREAM(pose); */
+    std::vector<double> joint_pos;
+    bool success = this->kinematics.findNearestIK(msg->point.x, msg->point.y, msg->point.z,
+                                                  this->current_joint_positions,
+                                                  joint_pos);
+    /* std::cout << success << std::endl; */
+    if (success)
+    {
+        this->target_joint_positions.clear();
+        for (double i : joint_pos)
+            this->target_joint_positions.push_back(i);
+    }
+    else
+        ROS_WARN_STREAM("Could not find a valid IK solution!");
 }
 
 void ArmController::positionCommandCb(const sensor_msgs::ChannelFloat32::ConstPtr& msg)
@@ -282,34 +278,6 @@ void ArmController::velocityCommandCb(const sensor_msgs::ChannelFloat32::ConstPt
         this->position_controllers[i].reset();
     }
 }
-
-/* bool ArmController::getIK(double x, double y, double z, std::vector<double> &joint_positions) */
-/* { */
-/*     /1* KDL::ChainIkSolverPos_LMA temp_ik_solver(this->my_chain); *1/ */
-/*     KDL::JntArray init_joint_pos(my_chain.getNrOfJoints()); */
-/*     KDL::JntArray final_joint_pos(my_chain.getNrOfJoints()); */
-/*     /1* KDL::Frame ee_pose(KDL::Rotation(0.84, -0.53, -0.0013, -0.0013, 0.00039, -0.99, -0.53, 0.84, 0.00039), KDL::Vector(x, y, z)); *1/ */
-/*     KDL::Frame ee_pose(KDL::Rotation(0.84, -0.0013, -0.53, -0.53, 0.00039, 0.84, -0.0013, -0.99, 0.00039), KDL::Vector(x, y, z)); */
-/*     /1* KDL::Frame ee_pose(KDL::Vector(x, y, z)); *1/ */
-
-/*     geometry_msgs::Pose pose; */
-/*     tf::poseKDLToMsg(ee_pose, pose); */
-/*     ROS_INFO_STREAM(pose); */
-
-/*     std::cout << ee_pose.p.x() << " " << ee_pose.p.y() << " " << ee_pose.p.z() << std::endl; */
-/*     /1* int ret = temp_ik_solver.CartToJnt(init_joint_pos, ee_pose, final_joint_pos); *1/ */
-/*     /1* int ret = this->ik_solver->CartToJnt(init_joint_pos, ee_pose, final_joint_pos); *1/ */
-/*     std::cout << ret << std::endl; */
-/*     if (ret < 0 && ret > -100) */
-/*         return false; */
-/*     for (int i = 0; i < final_joint_pos.rows(); i++) */
-/*     { */
-/*         /1* std::cout << final_joint_pos(i) << std::endl; *1/ */
-/*         joint_positions.push_back(final_joint_pos(i)); */
-/*     } */
-
-/*     return true; */
-/* } */
 
 void ArmController::publishJointVelocity(int joint_index, double joint_vel)
 {
