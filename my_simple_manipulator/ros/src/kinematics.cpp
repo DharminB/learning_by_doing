@@ -114,7 +114,8 @@ class Kinematics
                         this->findFK(joint_pos, fk_x, fk_y, fk_z);
                         if (fabs(fk_x - x) < this->ik_threshold &&
                             fabs(fk_y - y) < this->ik_threshold &&
-                            fabs(fk_z - z) < this->ik_threshold)
+                            fabs(fk_z - z) < this->ik_threshold &&
+                            this->withinJointLimit(joint_pos))
                             possible_solutions.push_back(joint_pos);
                     }
                 }
@@ -151,6 +152,21 @@ class Kinematics
             dest_joint_positions = possible_solutions[min_dist_index];
             return true;
 
+        };
+
+        bool withinJointLimit(std::vector<double> &joint_pos)
+        {
+            /* joint limits not available. Solution valid. */
+            if (this->joint_lower_limits.size() != joint_pos.size())
+                return true;
+
+            for (int i = 0; i < joint_pos.size(); ++i)
+            {
+                if (joint_pos[i] < this->joint_lower_limits[i] 
+                        || joint_pos[i] > this->joint_upper_limits[i])
+                    return false;
+            }
+            return true;
         };
 
 };

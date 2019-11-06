@@ -1,0 +1,46 @@
+#! /usr/bin/env python
+
+from __future__ import print_function
+
+import math
+import rospy
+import random
+from visualization_msgs.msg import Marker
+from geometry_msgs.msg import Point
+
+if __name__ == "__main__":
+    rospy.init_node('random_point_cmd')
+
+    pub = rospy.Publisher('/point_sphere', Marker, queue_size=1)
+    rospy.sleep(0.5)
+
+    a, b, c = 0.0, 0.0, 0.4
+    msg = Marker()
+    msg.header.frame_id = 'base_link'
+    msg.header.stamp = rospy.Time.now()
+    msg.ns = 'point_sphere'
+    msg.action = Marker.ADD
+    msg.pose.orientation.w = 1.0
+    msg.type = Marker.SPHERE_LIST
+    msg.scale.x = 0.01
+    msg.scale.y = 0.01
+    msg.scale.z = 0.01
+    msg.color.r = 1.0
+    msg.color.a = 1.0
+    radius = 0.1
+    while radius < 1.1:
+        theta_1 = -3.1
+        while theta_1 < 3.14:
+            theta_2 = -3.1
+            while theta_2 < 3.14:
+                x = a + math.sin(theta_2) * (radius * math.sin(theta_1))
+                y = b + radius * math.cos(theta_1)
+                z = c + math.cos(theta_2) * (radius * math.sin(theta_1))
+                msg.points.append(Point(x=x, y=y, z=z))
+                theta_2 += 0.1
+            theta_1 += 0.1
+        radius += 0.1
+    # print(msg)
+    pub.publish(msg)
+    rospy.sleep(0.5)
+    

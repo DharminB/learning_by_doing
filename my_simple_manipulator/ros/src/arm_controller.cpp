@@ -82,6 +82,7 @@ class ArmController
 
     public:
         ArmController(KDL::Chain &chain, int control_rate);
+        void publishZeroVelocity();
         void update();
 };
 
@@ -198,16 +199,25 @@ void ArmController::pointCommandCb(const geometry_msgs::PointStamped::ConstPtr& 
         ROS_WARN_STREAM("Frame should be base_link. Ignoring.");
         return;
     }
+    /* check for ground */
+    if (msg->point.z < 0.05)
+    {
+        ROS_WARN_STREAM("Target point below ground. Ignoring.");
+        return;
+    }
     std::vector<double> joint_pos;
     bool success = this->kinematics.findNearestIK(msg->point.x, msg->point.y, msg->point.z,
                                                   this->current_joint_positions,
                                                   joint_pos);
-    /* std::cout << success << std::endl; */
+    std::cout << success << std::endl;
     if (success)
     {
         this->target_joint_positions.clear();
         for (double i : joint_pos)
+        {
             this->target_joint_positions.push_back(i);
+            std::cout << i << std::endl;
+        }
     }
     else
         ROS_WARN_STREAM("Could not find a valid IK solution!");
@@ -276,6 +286,13 @@ void ArmController::velocityCommandCb(const sensor_msgs::ChannelFloat32::ConstPt
     {
         this->target_joint_velocities.push_back(msg->values[i]);
         this->position_controllers[i].reset();
+    }
+}
+
+void ArmController::publishZeroVelocity()
+{
+    for (int i = 0; i < this->my_chain.getNrOfJoints(); ++i) {
+        this->publishJointVelocity(i, 0.0);
     }
 }
 
@@ -351,11 +368,10 @@ std::string getEndEffector(KDL::Tree tree)
     return end_effector_name;
 }
 
-int main(int argc, char *argv[])
+KDL::Chain getChainFromParam(std::string param_name)
 {
-    ros::init(argc, argv, "arm_controller");
     KDL::Tree my_tree;
-    if (!kdl_parser::treeFromParam("/robot_description", my_tree))
+    if (!kdl_parser::treeFromParam(param_name, my_tree))
     {
         ROS_ERROR("Failed to construct kdl tree. Exiting.");
         exit(1);
@@ -374,6 +390,13 @@ int main(int argc, char *argv[])
 
     ROS_INFO_STREAM("Successfully created kdl chain");
     std::cout << my_chain.getNrOfJoints() << " joints found." << std::endl;
+    return my_chain;
+}
+
+int main(int argc, char *argv[])
+{
+    ros::init(argc, argv, "arm_controller");
+    KDL::Chain my_chain = getChainFromParam("/robot_description");
     int control_rate = 10;
     ArmController arm_controller(my_chain, control_rate);
 
@@ -384,6 +407,7 @@ int main(int argc, char *argv[])
         arm_controller.update();
         rate.sleep();
     }
+    arm_controller.publishZeroVelocity();
     std::cout << "Exiting." << std::endl;
 
     return 0;

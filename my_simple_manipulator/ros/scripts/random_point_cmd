@@ -1,0 +1,38 @@
+#! /usr/bin/env python
+
+from __future__ import print_function
+
+import math
+import rospy
+import random
+from geometry_msgs.msg import PointStamped, Point
+
+def get_random_radius():
+    return random.uniform(0.0, 1.1)
+
+def get_random_angle():
+    return random.uniform(-math.pi, math.pi)
+
+if __name__ == "__main__":
+    rospy.init_node('random_point_cmd')
+
+    pub = rospy.Publisher('/arm_controller/point_command', PointStamped, queue_size=1)
+    rospy.logwarn("hello there")
+    rospy.sleep(0.5)
+
+    a, b, c = 0.0, 0.0, 0.4
+    radius = get_random_radius()
+    theta_1 = get_random_angle()
+    theta_2 = get_random_angle()
+    x = a + math.sin(theta_2) * (radius * math.sin(theta_1))
+    y = b + radius * math.cos(theta_1)
+    z = c + math.cos(theta_2) * (radius * math.sin(theta_1))
+    print(x, y, z)
+    msg = PointStamped()
+    msg.header.frame_id = 'base_link'
+    msg.header.stamp = rospy.Time.now()
+    msg.point = Point(x=x, y=y, z=z)
+    print(msg)
+    pub.publish(msg)
+    rospy.sleep(0.5)
+    
