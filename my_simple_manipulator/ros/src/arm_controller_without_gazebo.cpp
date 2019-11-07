@@ -41,6 +41,7 @@ class ArmController
         double proportional_factor = 1.5;
         double integral_factor = 0.005;
         double differential_factor = 0.1;
+        double i_clamp = 3.0;
         double position_threshold = 0.001;
         double velocity_threshold = 0.001;
         double max_vel = 0.5;
@@ -280,7 +281,7 @@ void ArmController::initialiseJoints()
         /* this->target_joint_velocities.push_back(0.0); */
         PIDController pid(this->proportional_factor, this->integral_factor,
                           this->differential_factor, this->control_rate,
-                          this->position_threshold);
+                          this->position_threshold, this->i_clamp);
         this->position_controllers.push_back(pid);
     }
 }

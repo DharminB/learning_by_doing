@@ -34,8 +34,6 @@ class ArmController
         std::vector<std::string> joint_names;
         std::vector<double> joint_lower_limits;
         std::vector<double> joint_upper_limits;
-        /* KDL::ChainFkSolverPos_recursive *fk_solver; */
-        /* KDL::ChainIkSolverPos_NR_JL *ik_solver; */
         Kinematics kinematics;
 
         std::vector<double> target_joint_positions;
@@ -45,13 +43,13 @@ class ArmController
         std::vector<PIDController> position_controllers;
 
         /* pid related variables */
-        double proportional_factor = 1.5;
-        double integral_factor = 0.005;
-        double differential_factor = 0.1;
+        double proportional_factor = 2.0;
+        double integral_factor = 0.001;
+        double differential_factor = 0.2;
+        double i_clamp = 2.0;
         double position_threshold = 0.001;
-        double velocity_threshold = 0.001;
         double max_vel = 0.5;
-        double min_vel = 0.001;
+        double min_vel = 0.0001;
 
         ros::NodeHandle nh;
         std::vector<ros::Publisher> joint_vel_pubs;
@@ -139,6 +137,7 @@ void ArmController::update()
         /* std::cout << this->current_joint_positions[i] << std::endl; */
         if (this->target_joint_positions.size() > 0)
         {
+            /* std::cout << i << std::endl; */
             double vel = this->position_controllers[i].control(this->current_joint_positions[i],
                                                         this->target_joint_positions[i]);
             double safe_vel;
@@ -159,7 +158,8 @@ void ArmController::update()
                 || future_position > this->joint_upper_limits[i])
         {
             ROS_WARN_STREAM("Joint value for " << this->joint_names[i]
-                            << " is outside limit! Stopping motion.");
+                            << " is out of limit! Stopping motion.");
+            std::cout << "Joint value out of limit. Stopping motion" << std::endl;
             this->publishJointVelocity(i, 0.0);
         }
     }
@@ -170,6 +170,7 @@ void ArmController::update()
     {
         this->target_joint_positions.clear();
         std::cout << "Reached target position" << std::endl;
+        this->publishZeroVelocity();
     }
 
     /* ROS_INFO_STREAM(this->joint_state_msg); */
@@ -182,6 +183,7 @@ void ArmController::jointStateCb(const sensor_msgs::JointState::ConstPtr& msg)
     {
         ROS_WARN_STREAM("Number of joints mismatch! Expecting " 
                         << this->joint_names.size() << " values.");
+        std::cout << "Number of joint mismatch" << std::endl;
         return;
     }
     for (int i = 0; i < msg->position.size(); i++)
@@ -197,30 +199,37 @@ void ArmController::pointCommandCb(const geometry_msgs::PointStamped::ConstPtr& 
     if (msg->header.frame_id != "base_link")
     {
         ROS_WARN_STREAM("Frame should be base_link. Ignoring.");
+        std::cout << "Frame shoud be base_link" << std::endl;
         return;
     }
     /* check for ground */
     if (msg->point.z < 0.05)
     {
         ROS_WARN_STREAM("Target point below ground. Ignoring.");
+        std::cout << "Target point is below ground. Ignoring." << std::endl;
         return;
     }
     std::vector<double> joint_pos;
     bool success = this->kinematics.findNearestIK(msg->point.x, msg->point.y, msg->point.z,
                                                   this->current_joint_positions,
                                                   joint_pos);
-    std::cout << success << std::endl;
+    /* std::cout << success << std::endl; */
     if (success)
     {
         this->target_joint_positions.clear();
+        std::cout << "IK solution:";
         for (double i : joint_pos)
         {
             this->target_joint_positions.push_back(i);
-            std::cout << i << std::endl;
+            std::cout << " " << i;
         }
+        std::cout << std::endl;
     }
     else
+    {
         ROS_WARN_STREAM("Could not find a valid IK solution!");
+        std::cout << "Could not find a valid IK solution" << std::endl;
+    }
 }
 
 void ArmController::positionCommandCb(const sensor_msgs::ChannelFloat32::ConstPtr& msg)
@@ -231,6 +240,7 @@ void ArmController::positionCommandCb(const sensor_msgs::ChannelFloat32::ConstPt
     {
         ROS_WARN_STREAM("Number of joints mismatch! Expecting " 
                         << this->joint_names.size() << " values.");
+        std::cout << "Number of joint mismatch" << std::endl;
         return;
     }
     /* check for joint limits */
@@ -240,9 +250,10 @@ void ArmController::positionCommandCb(const sensor_msgs::ChannelFloat32::ConstPt
                 || msg->values[i] > this->joint_upper_limits[i])
         {
             ROS_WARN_STREAM("Joint value for " << this->joint_names[i]
-                            << " is outside limit! Expecting values between "
+                            << " is out of limit! Expecting values between "
                             << this->joint_lower_limits[i] << " and "
                             << this->joint_upper_limits[i] << ".");
+            std::cout << "Joint value out of limit" << std::endl;
             return;
         }
     }
@@ -347,10 +358,13 @@ void ArmController::initialiseJoints()
         /* this->target_joint_velocities.push_back(0.0); */
         PIDController pid(this->proportional_factor, this->integral_factor,
                           this->differential_factor, this->control_rate,
-                          this->position_threshold);
+                          this->position_threshold, this->i_clamp);
         this->position_controllers.push_back(pid);
     }
 }
+
+/* ======================================================================== */
+/* ======================================================================== */
 
 std::string getEndEffector(KDL::Tree tree)
 {
