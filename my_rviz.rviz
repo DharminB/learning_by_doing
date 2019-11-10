@@ -6,8 +6,6 @@ Panels:
       Expanded:
         - /Global Options1
         - /TF1/Frames1
-        - /PointStamped1
-        - /PointStamped1/Status1
       Splitter Ratio: 0.5
     Tree Height: 470
   - Class: rviz/Selection
@@ -152,6 +150,14 @@ Visualization Manager:
       Topic: /arm_controller/point_command
       Unreliable: false
       Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /reachability
+      Name: Reachability
+      Namespaces:
+        point_sphere: true
+      Queue Size: 100
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -177,25 +183,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 3.46763968
+      Distance: 4.03954411
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.0599999987
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0.0923852399
-        Y: 0.48620677
-        Z: 0.658160567
+        X: 0.0226084776
+        Y: 0.244818181
+        Z: 0.489515245
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.0500000007
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.00999999978
-      Pitch: 0.359797597
+      Pitch: 0.209798202
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 4.67858076
+      Yaw: 4.72362041
     Saved: ~
 Window Geometry:
   Displays:
