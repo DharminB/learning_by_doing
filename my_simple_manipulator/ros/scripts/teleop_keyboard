@@ -1,0 +1,81 @@
+#! /usr/bin/env python
+
+from __future__ import print_function
+
+import sys
+import rospy
+import curses
+from sensor_msgs.msg import ChannelFloat32
+from kdl_parser_py import urdf
+
+def get_chain_from_param(param_name):
+    success, tree = urdf.treeFromParam(param_name)
+    if not success:
+        rospy.logfatal('Could not get tree from ros param')
+        sys.exit(1)
+    chain = tree.getChain('base_link', 'end_effector')
+    if chain is None:
+        rospy.logfatal('Could not get chain from tree')
+        sys.exit(1)
+    return chain
+
+def main(stdscr):
+    vel_pub = rospy.Publisher('/arm_controller/velocity_command', ChannelFloat32, queue_size=1)
+    stdscr.nodelay(True)
+    current_joint = 0
+    strings = ['Press Ctrl-c to exit',
+               'Press A / D to decrease or increase current joint\'s angle',
+               'Press W / S to move between joints',
+               'Current joint number: ']
+    prev_vel = 0.0
+    user_input = [-1]*5 # a queue of user input keys
+    while not rospy.is_shutdown():
+        c = stdscr.getch()
+        # stdscr.clear()
+        miny, minx = stdscr.getbegyx()
+        maxy, maxx = stdscr.getmaxyx()
+        strings[-1] = "Current joint number: " + str(current_joint+1) + " / " + str(NUM_OF_JOINTS)
+        for i, string in enumerate(strings):
+            stdscr.addstr(maxy-miny-(len(strings)-i+1), 0, string)
+        if c == ord('w') :
+            current_joint += 1
+            current_joint %= NUM_OF_JOINTS
+        elif c == ord('s') :
+            current_joint -= 1
+            current_joint %= NUM_OF_JOINTS
+
+        user_input.pop(0)
+        user_input.append(c)
+        # stdscr.addstr(maxy-miny-1, 0, ' '*30)
+        # stdscr.addstr(maxy-miny-1, 0, str(user_input))
+
+        if ord('a') in user_input:
+            vel = -0.1
+        elif ord('d') in user_input:
+            vel = 0.1
+        else:
+            vel = 0.0
+
+        # stdscr.addstr(maxy-miny-10, 0, str(vel)+" "+str(prev_vel))
+
+        if vel != prev_vel:
+            velocities = [0.0]*NUM_OF_JOINTS
+            velocities[current_joint] = vel
+            vel_pub.publish(ChannelFloat32(values=velocities))
+            rospy.sleep(0.1)
+
+        prev_vel = vel
+
+        rospy.sleep(0.01)
+        stdscr.refresh()
+
+
+if __name__ == "__main__":
+    rospy.init_node('teleop_keyboard')
+    CHAIN = get_chain_from_param('/robot_description')
+    NUM_OF_JOINTS = CHAIN.getNrOfJoints()
+    # rospy.spin()
+    try:
+        curses.wrapper(main)
+    except Exception as e:
+        print(str(e))
