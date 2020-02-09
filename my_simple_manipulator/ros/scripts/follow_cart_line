@@ -1,0 +1,77 @@
+#! /usr/bin/env python
+
+from __future__ import print_function
+
+import copy
+import math
+import rospy
+import numpy as np
+from geometry_msgs.msg import Point, PointStamped, Vector3
+from visualization_msgs.msg import Marker
+from sensor_msgs.msg import JointState
+
+LAST_POS = np.array([0.0, 0.0, 0.0])
+STOPPED_MOVING = False
+
+def joint_state_cb(msg):
+    global STOPPED_MOVING, LAST_POS
+    new_pos = np.array(msg.position)
+    diff = new_pos - LAST_POS
+    LAST_POS = new_pos
+    STOPPED_MOVING = np.linalg.norm(diff) < 0.0001
+
+def main():
+    pub = rospy.Publisher('/arm_controller/cart_vel_command', Vector3, queue_size=1)
+    point_pub = rospy.Publisher('/arm_controller/point_command', PointStamped, queue_size=1)
+    marker_cell_pub = rospy.Publisher('/desired_trajectory', Marker, queue_size=1)
+    joint_state_sub = rospy.Subscriber('/joint_states', JointState, joint_state_cb)
+    rospy.sleep(0.5)
+
+    start_point = Point(x=-0.3, y=-0.4, z=0.9)
+    msg = PointStamped()
+    msg.header.frame_id = 'base_link'
+    msg.header.stamp = rospy.Time.now()
+    msg.point = start_point
+    point_pub.publish(msg)
+
+    vel_x = 0.05
+    trajectory_time = 10.0
+
+    marker = Marker()
+    marker.header.frame_id = 'base_link'
+    marker.header.stamp = rospy.Time.now()
+    marker.id = 1
+    marker.type = Marker.LINE_LIST
+    marker.color.g = marker.color.a = 1.0
+    marker.scale.x = 0.02
+    marker.scale.y = 0.02
+    marker.scale.z = 0.02
+    for i in range(100):
+        new_point = copy.deepcopy(start_point)
+        new_point.x += i*vel_x*trajectory_time/100
+        new_end_point = copy.deepcopy(start_point)
+        new_end_point.x += (i+1)*vel_x*trajectory_time/100
+        marker.points.append(new_point)
+        marker.points.append(new_end_point)
+    marker_cell_pub.publish(marker)
+        
+
+    rospy.sleep(1.0)
+    while not STOPPED_MOVING:
+        rospy.sleep(0.2)
+
+    zero_vel = Vector3(x=0.0, y=0.0, z=0.0)
+    vel = Vector3(x=vel_x, y=0.0, z=0.0)
+    start_time = rospy.Time.now()
+    while rospy.Time.now() - rospy.Duration(trajectory_time) < start_time:
+        marker_cell_pub.publish(marker)
+        rospy.sleep(0.2)
+        pub.publish(vel)
+
+    pub.publish(zero_vel)
+    rospy.sleep(1.0)
+    
+
+if __name__ == "__main__":
+    rospy.init_node('follow_cart_line')
+    main()
