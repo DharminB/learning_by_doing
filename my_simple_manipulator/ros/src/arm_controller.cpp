@@ -16,16 +16,17 @@
 #include <kdl/frames.hpp>
 #include <kdl/jntarray.hpp>
 #include <kdl_conversions/kdl_msg.h>
-#include <kdl/chainfksolverpos_recursive.hpp>
-#include <kdl/chainiksolverpos_lma.hpp>
-#include <kdl/chainiksolverpos_nr_jl.hpp>
-#include <kdl/chainiksolvervel_pinv.hpp>
 
 #include <pid_controller.cpp>
 #include <kinematics.cpp>
 
 class ArmController
 {
+    public:
+        ArmController(KDL::Chain &chain, int control_rate);
+        void publishZeroVelocity();
+        void update();
+
     private:
         int control_rate;
 
@@ -35,6 +36,7 @@ class ArmController
         std::vector<double> joint_lower_limits;
         std::vector<double> joint_upper_limits;
         Kinematics kinematics;
+        int cart_vel_countdown, cart_vel_countdown_start = 10;
 
         std::vector<double> target_joint_positions;
         std::vector<double> target_joint_velocities;
@@ -55,6 +57,7 @@ class ArmController
         std::vector<ros::Publisher> joint_vel_pubs;
         ros::Subscriber point_command_sub;
         ros::Subscriber position_command_sub;
+        ros::Subscriber cart_vel_command_sub;
         ros::Subscriber velocity_command_sub;
         ros::Subscriber joint_state_sub;
 
@@ -64,6 +67,8 @@ class ArmController
          */
         /* std::string getEndEffector(KDL::Tree tree); */
 
+        void CartVelCommandCb(const geometry_msgs::Vector3::ConstPtr& msg);
+
         void pointCommandCb(const geometry_msgs::PointStamped::ConstPtr& msg);
 
         void positionCommandCb(const sensor_msgs::ChannelFloat32::ConstPtr& msg);
@@ -72,16 +77,9 @@ class ArmController
 
         void jointStateCb(const sensor_msgs::JointState::ConstPtr& msg);
 
-        /* bool getIK(double x, double y, double z, std::vector<double> &joint_positions); */
-
         void publishJointVelocity(int joint_index, double joint_vel);
 
         void initialiseJoints();
-
-    public:
-        ArmController(KDL::Chain &chain, int control_rate);
-        void publishZeroVelocity();
-        void update();
 };
 
 ArmController::ArmController(KDL::Chain &chain, int control_rate):
@@ -118,11 +116,15 @@ ArmController::ArmController(KDL::Chain &chain, int control_rate):
     position_command_sub = nh.subscribe<sensor_msgs::ChannelFloat32>
                                         ("position_command", 1,
                                          &ArmController::positionCommandCb, this);
+    cart_vel_command_sub = nh.subscribe<geometry_msgs::Vector3>
+                                        ("cart_vel_command", 1,
+                                         &ArmController::CartVelCommandCb, this);
     velocity_command_sub = nh.subscribe<sensor_msgs::ChannelFloat32>
                                         ("velocity_command", 1,
                                          &ArmController::velocityCommandCb, this);
 
     this->kinematics.setJointLimits(this->joint_lower_limits, this->joint_upper_limits);
+    this->cart_vel_countdown = 0;
     /* std::vector<double> joints({0.0, 1.0, 0.0}); */
     /* double x, y, z; */
     /* this->kinematics.findFK(joints, x, y, z); */
@@ -150,7 +152,9 @@ void ArmController::update()
             }
         }
         if (this->target_joint_velocities.size() > 0)
+        {
             this->publishJointVelocity(i, this->target_joint_velocities[i]);
+        }
 
         /* safety condition */
         double future_position = this->current_joint_positions[i] + this->current_joint_velocities[i] / this->control_rate;
@@ -164,7 +168,17 @@ void ArmController::update()
         }
     }
     if (this->target_joint_velocities.size() > 0)
-        this->target_joint_velocities.clear();
+    {
+        if (this->cart_vel_countdown <= 0)
+        {
+            this->target_joint_velocities.clear();
+            this->publishZeroVelocity();
+        }
+        else
+        {
+            this->cart_vel_countdown--;
+        }
+    }
 
     if (this->target_joint_positions.size() > 0 && !moved_arm_using_pos_cmd)
     {
@@ -195,7 +209,7 @@ void ArmController::jointStateCb(const sensor_msgs::JointState::ConstPtr& msg)
 
 void ArmController::pointCommandCb(const geometry_msgs::PointStamped::ConstPtr& msg)
 {
-    ROS_INFO_STREAM(*msg);
+    std::cout << *msg;
     if (msg->header.frame_id != "base_link")
     {
         ROS_WARN_STREAM("Frame should be base_link. Ignoring.");
@@ -210,18 +224,24 @@ void ArmController::pointCommandCb(const geometry_msgs::PointStamped::ConstPtr& 
         return;
     }
     std::vector<double> joint_pos;
-    bool success = this->kinematics.findNearestIK(msg->point.x, msg->point.y, msg->point.z,
+    bool success = this->kinematics.findNearestIK(msg->point.x,
+                                                  msg->point.y,
+                                                  msg->point.z, 
                                                   this->current_joint_positions,
                                                   joint_pos);
     /* std::cout << success << std::endl; */
     if (success)
     {
+        /* set target joint positions and reset target joint vel */
         this->target_joint_positions.clear();
+        this->target_joint_velocities.clear();
+
         std::cout << "IK solution:";
-        for (double i : joint_pos)
+        for (double i = 0; i < joint_pos.size(); ++i)
         {
-            this->target_joint_positions.push_back(i);
-            std::cout << " " << i;
+            this->target_joint_positions.push_back(joint_pos[i]);
+            this->position_controllers[i].reset();
+            std::cout << " " << joint_pos[i];
         }
         std::cout << std::endl;
     }
@@ -234,7 +254,7 @@ void ArmController::pointCommandCb(const geometry_msgs::PointStamped::ConstPtr& 
 
 void ArmController::positionCommandCb(const sensor_msgs::ChannelFloat32::ConstPtr& msg)
 {
-    ROS_INFO_STREAM(*msg);
+    std::cout << *msg;
     /* check for number of values provided */
     if (msg->values.size() != this->joint_names.size())
     {
@@ -267,9 +287,42 @@ void ArmController::positionCommandCb(const sensor_msgs::ChannelFloat32::ConstPt
     }
 }
 
+void ArmController::CartVelCommandCb(const geometry_msgs::Vector3::ConstPtr& msg)
+{
+    std::cout << *msg;
+    std::vector<double> out_vel;
+    this->kinematics.findIKVel(msg->x, msg->y, msg->z, this->current_joint_positions, out_vel);
+
+    /* filter vel */
+    std::cout << "Calculated vel:";
+    for (double i = 0; i < out_vel.size(); ++i)
+    {
+        std::cout << " " << out_vel[i];
+        if (fabs(out_vel[i]) < this->min_vel)
+            out_vel[i] = 0.0;
+        if (fabs(out_vel[i]) > this->max_vel)
+        {
+            std::cout << "Calculated velocity exceeded max vel. Ignoring." << std::endl;
+            return;
+        }
+    }
+    std::cout << std::endl;
+
+    /* set target joint positions and reset target joint vel */
+    this->target_joint_positions.clear();
+    this->target_joint_velocities.clear();
+
+    for (double i = 0; i < out_vel.size(); ++i)
+    {
+            this->target_joint_velocities.push_back(out_vel[i]);
+            this->position_controllers[i].reset();
+    }
+    this->cart_vel_countdown = this->cart_vel_countdown_start;
+}
+
 void ArmController::velocityCommandCb(const sensor_msgs::ChannelFloat32::ConstPtr& msg)
 {
-    ROS_INFO_STREAM(*msg);
+    std::cout << *msg;
     /* check for number of values provided */
     if (msg->values.size() != this->joint_names.size())
     {
