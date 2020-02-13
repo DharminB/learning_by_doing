@@ -1,0 +1,152 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="my_simple_mobile_base">
+
+    <!-- <xacro:property name="base_length" value="0.5" /> -->
+    <xacro:property name="base_mass" value="30.0" />
+    <xacro:property name="wheel_mass" value="5.0" />
+    <xacro:property name="wheel_radius" value="0.05" />
+
+    <xacro:macro name="cuboid_inertia" params="mass length breadth height">
+        <inertial>
+            <mass value="${mass}" />
+            <inertia ixx="${(mass/12)*(breadth*breadth + height*height)}"
+                     iyy="${(mass/12)*(height*height + length*length)}"
+                     iyz="0.0" ixy="0.0" ixz="0.0"
+                     izz="${(mass/12)*(breadth*breadth + length*length)}" />
+        </inertial>
+    </xacro:macro>
+
+    <xacro:macro name="sphere_inertia" params="mass radius">
+        <inertial>
+            <mass value="${mass}" />
+            <inertia ixx="${(mass*0.4)*(radius*radius)}"
+                     iyy="${(mass*0.4)*(radius*radius)}"
+                     iyz="0.0" ixy="0.0" ixz="0.0"
+                     izz="${(mass*0.4)*(radius*radius)}" />
+        </inertial>
+    </xacro:macro>
+
+    <xacro:macro name="wheel" params="name parent *origin mass radius">
+        <joint name="joint_${name}" type="fixed">
+            <xacro:insert_block name="origin" />
+            <parent link="${parent}"/>
+            <child link="${name}_link"/>
+        </joint>
+        <link name="${name}_link">
+            <visual>
+                <geometry>
+                    <sphere radius="${radius}"/>
+                </geometry>
+                <origin xyz='0.0 0.0 0.0' rpy='1.57 0.0 0.0' />
+                <material name="light_grey"/>
+            </visual>
+            <collision>
+                <geometry>
+                    <sphere radius="${radius}"/>
+                </geometry>
+                <origin xyz='0.0 0.0 0.0' rpy='0.0 0.0 0.0' />
+            </collision>
+            <xacro:sphere_inertia mass="${mass}" radius="${radius}" />
+        </link>
+        <gazebo reference="${name}_link">
+            <material>Gazebo/Grey</material>
+        </gazebo>
+    </xacro:macro>
+
+    <material name="black">
+        <color rgba="0.0 0.0 0.0 1.0"/>
+    </material>
+    <material name="light_grey">
+        <color rgba="0.4 0.4 0.4 1.0"/>
+    </material>
+
+    <link name="base_link">
+        <visual>
+            <geometry>
+                <box size='0.1 0.3 0.05'/>
+            </geometry>
+            <origin xyz='-0.2 0.0 0.0' rpy='0.0 0.0 0.0' />
+            <material name="black"/>
+        </visual>
+        <visual>
+            <geometry>
+                <box size='0.3 0.3 0.05'/>
+            </geometry>
+            <origin xyz='0.0 0.0 0.0' rpy='0.0 0.0 0.0' />
+            <material name="black"/>
+        </visual>
+        <visual>
+            <geometry>
+                <box size='0.1 0.1 0.05'/>
+            </geometry>
+            <origin xyz='0.2 0.0 0.0' rpy='0.0 0.0 0.0' />
+            <material name="black"/>
+        </visual>
+        <visual>
+            <geometry>
+                <box size='0.3 0.1 0.05'/>
+            </geometry>
+            <origin xyz='0.0 0.15 0.0' rpy='0.0 0.0 -0.3' />
+            <material name="black"/>
+        </visual>
+        <visual>
+            <geometry>
+                <box size='0.3 0.1 0.05'/>
+            </geometry>
+            <origin xyz='0.0 -0.15 0.0' rpy='0.0 0.0 0.3' />
+            <material name="black"/>
+        </visual>
+        <collision>
+            <geometry>
+                <box size='0.5 0.3 0.05'/>
+            </geometry>
+            <origin xyz='0.0 0.0 0.0' rpy='0.0 0.0 0.0' />
+        </collision>
+        <xacro:cuboid_inertia mass="${base_mass}" length="0.5" breadth="0.3" height="0.05"/>
+    </link>
+
+    <gazebo reference="base_link">
+        <material>Gazebo/Black</material>
+    </gazebo>
+
+    <!-- ====== -->
+    <!-- WHEELS -->
+    <!-- ====== -->
+    <xacro:wheel name="rear_left_wheel" parent="base_link"
+                        mass="${wheel_mass}" radius="${wheel_radius}" >
+        <origin xyz="-0.2 0.2 -0.025" rpy="0 0 0.0" />
+    </xacro:wheel>
+
+    <xacro:wheel name="rear_right_wheel" parent="base_link"
+                        mass="${wheel_mass}" radius="${wheel_radius}" >
+        <origin xyz="-0.2 -0.2 -0.025" rpy="0 0 0.0" />
+    </xacro:wheel>
+
+    <xacro:wheel name="front_left_wheel" parent="base_link"
+                        mass="${wheel_mass}" radius="${wheel_radius}" >
+        <origin xyz="0.2 0.1 -0.025" rpy="0 0 0.0" />
+    </xacro:wheel>
+
+    <xacro:wheel name="front_right_wheel" parent="base_link"
+                        mass="${wheel_mass}" radius="${wheel_radius}" >
+        <origin xyz="0.2 -0.1 -0.025" rpy="0 0 0.0" />
+    </xacro:wheel>
+
+    <gazebo>
+        <plugin name="object_controller" filename="libgazebo_ros_planar_move.so">
+            <commandTopic>cmd_vel</commandTopic>
+            <odometryTopic>odom</odometryTopic>
+            <odometryFrame>odom</odometryFrame>
+            <odometryRate>20.0</odometryRate>
+            <robotBaseFrame>base_link</robotBaseFrame>
+        </plugin>
+    </gazebo>
+
+    <gazebo>
+        <plugin name="gazebo_ros_control" filename="libgazebo_ros_control.so">
+            <robotNamespace>/</robotNamespace>
+            <robotSimType>gazebo_ros_control/DefaultRobotHWSim</robotSimType>
+            <legacyModeNS>true</legacyModeNS>
+        </plugin>
+    </gazebo>
+</robot>

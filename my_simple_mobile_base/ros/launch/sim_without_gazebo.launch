@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <launch>
     <!-- Robot description for rviz -->
-    <param name="robot_description" command="xacro --inorder '$(find my_simple_manipulator)/ros/config/my_robot.xacro'" />
+    <param name="robot_description" command="xacro --inorder '$(find my_simple_mobile_base)/ros/config/my_robot.xacro'" />
 
     <node pkg="robot_state_publisher" type="robot_state_publisher" name="rob_st_pub" />
 
