@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<launch>
+    <arg name="world_model_name" default="two_rooms"/>
+
+    <arg name="map_file" default="$(find basic_navigation)/common/maps/$(arg world_model_name)/map.yaml" />
+    <arg name="map_offset_x" default="1.0" />
+    <arg name="map_offset_y" default="0.0" />
+    <arg name="map_offset_theta" default="0.0" />
+
+    <arg name="paused" default="false"/>
+    <arg name="gui" default="false"/>
+
+    <!-- Load the world -->
+    <include file="$(find my_simple_mobile_base)/ros/launch/sim.launch">
+        <arg name="gui" value="$(arg gui)" />
+        <arg name="paused" value="$(arg paused)"/>
+        <arg name="world_model_name" value="$(arg world_model_name)"/>
+        <arg name="start_rviz" value="false"/>
+    </include>
+
+
+    <include file="$(find basic_navigation)/ros/launch/amcl.launch">
+        <arg name="initial_pose_x" value="$(arg map_offset_x)" />
+        <arg name="initial_pose_y" value="$(arg map_offset_y)" />
+        <arg name="initial_pose_a" value="$(arg map_offset_theta)" />
+    </include>
+
+    <!-- Run the map server -->
+    <node name="map_server" pkg="map_server" type="map_server" args="$(arg map_file)" />
+
+    <node pkg="rviz" type="rviz" name="rviz" args="-d $(find basic_navigation)/ros/config/basic_navigation.rviz" />
+
+</launch>

@@ -9,8 +9,9 @@
     <arg name="debug" default="false"/>
 
     <!-- model args -->
+    <arg name="world_model_name" default="two_rooms"/>
     <arg name="model" default="$(find my_simple_mobile_base)/ros/description/my_robot.xacro"/>
-    <arg name="world_model" default="$(find my_simple_mobile_base)/ros/description/two_rooms.xacro"/>
+    <arg name="world_model" default="$(find my_simple_mobile_base)/ros/description/$(arg world_model_name).xacro"/>
 
     <arg name="start_rviz" default="true"/>
 

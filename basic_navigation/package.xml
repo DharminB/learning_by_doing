@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>basic_navigation</name>
+  <version>0.1.0</version>
+  <description>Navigation to move a mobile robot in a straight line path or using
+  a global planner's path. </description>
+
+  <maintainer email="dharmingeo@gmail.com">Dharmin B.</maintainer>
+
+  <license>GPLv3</license>
+
+  <author email="dharmingeo@gmail.com">Dharmin B.</author>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <build_depend>costmap_2d</build_depend>
+  <build_depend>global_planner</build_depend>
+  <build_depend>my_simple_mobile_base</build_depend>
+
+  <exec_depend>costmap_2d</exec_depend>
+  <exec_depend>global_planner</exec_depend>
+  <exec_depend>my_simple_mobile_base</exec_depend>
+
+  <export>
+  </export>
+
+</package>
