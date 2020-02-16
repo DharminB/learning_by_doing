@@ -23,7 +23,7 @@
                   file="$(find basic_navigation)/ros/config/global_costmap_params.yaml"/>
     </node>
 
-    <node pkg="basic_navigation" name="basic_navigation" type="basic_navigation" output="screen" >
+    <node pkg="basic_navigation" name="basic_navigation" type="basic_navigation_node" output="screen" >
         <rosparam command="load"
                   file="$(find basic_navigation)/ros/config/basic_navigation_params.yaml" />
         <param name="global_planner_service" type="string" value="$(arg global_planner_service)"/>

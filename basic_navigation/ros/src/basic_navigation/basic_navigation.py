@@ -1,18 +1,17 @@
-#! /usr/bin/env python
-
 from __future__ import print_function
 
 import copy
 import math
 import rospy
-import traceback
+from std_msgs.msg import Empty
 from nav_msgs.msg import OccupancyGrid, Path
 from geometry_msgs.msg import PoseStamped, PointStamped
 from geometry_msgs.msg import Twist, PoseWithCovarianceStamped
 
 from navfn.srv import MakeNavPlan, MakeNavPlanRequest, MakeNavPlanResponse
 
-from basic_navigation.utils import Utils
+from utils import Utils
+from global_planner_utils import GlobalPlannerUtils
 
 class BasicNavigation(object):
 
@@ -26,6 +25,7 @@ class BasicNavigation(object):
         self.reached_goal_once = False
         self.moving_backward = False
         self.global_frame = rospy.get_param('~global_frame', 'map')
+        self.robot_frame = rospy.get_param('~robot_frame', 'base_link')
         self.use_global_planner = rospy.get_param('~use_global_planner', False)
         self.allow_backward_motion = rospy.get_param('~allow_backward_motion', False)
         self.num_of_retries = rospy.get_param('~num_of_retries', 3)
@@ -49,6 +49,7 @@ class BasicNavigation(object):
         self.max_linear_vel = rospy.get_param('~max_linear_vel', 0.3)
         self.min_linear_vel = rospy.get_param('~min_linear_vel', 0.1)
         self.future_pos_lookahead_dist = rospy.get_param('~future_pos_lookahead_dist', 0.4)
+        self.future_pos_lookahead_time = rospy.get_param('~future_pos_lookahead_time', 3.0)
 
         # recovery
         self.recovery_enabled = rospy.get_param('~recovery_enabled', False)
@@ -62,6 +63,7 @@ class BasicNavigation(object):
         # Publishers
         self._cmd_vel_pub = rospy.Publisher('~cmd_vel', Twist, queue_size=1)
         self._path_pub = rospy.Publisher('~path', Path, queue_size=1)
+        self._traj_pub = rospy.Publisher('~trajectory', Path, queue_size=1)
         self._collision_lookahead_point_pub = rospy.Publisher('~collision_point',
                                                               PointStamped,
                                                               queue_size=1)
@@ -70,14 +72,12 @@ class BasicNavigation(object):
         costmap_sub = rospy.Subscriber('~costmap', OccupancyGrid, self.costmap_cb)
         goal_sub = rospy.Subscriber('~goal', PoseStamped, self.goal_cb)
         localisation_sub = rospy.Subscriber('~localisation', PoseWithCovarianceStamped, self.localisation_cb)
+        cancel_goal_sub = rospy.Subscriber('~cancel', Empty, self.cancel_current_goal)
 
         # Service client
+        # Global planner
         if self.use_global_planner:
-            global_planner_service_topic = rospy.get_param('~global_planner_service', 'make_plan')
-            rospy.loginfo('Waiting for global planner')
-            rospy.wait_for_service(global_planner_service_topic)
-            rospy.loginfo('Wait complete.')
-            self.call_global_planner = rospy.ServiceProxy(global_planner_service_topic, MakeNavPlan)
+            self.global_planner_utils = GlobalPlannerUtils()
 
         rospy.sleep(0.5)
         rospy.loginfo('Initialised')
@@ -110,11 +110,7 @@ class BasicNavigation(object):
             angular_dist = Utils.get_shortest_angle(curr_goal[2], self.curr_pos[2])
             if abs(angular_dist) < self.goal_theta_tolerance:
                 rospy.loginfo('REACHED GOAL')
-                self.publish_zero_vel()
-                self.goal = None
-                self.plan = None
-                self.moving_backward = False
-                self.reached_goal_once = False
+                self._reset_state()
                 return
             else:
                 self._rotate_in_place(theta_error=angular_dist)
@@ -142,6 +138,7 @@ class BasicNavigation(object):
         theta_vel_raw = theta_error * self.p_theta_in_place
         theta_vel = Utils.clip(theta_vel_raw, self.max_theta_vel, self.min_theta_vel)
         self._cmd_vel_pub.publish(Utils.get_twist(x=0.0, y=0.0, theta=theta_vel))
+        self._traj_pub.publish(self._get_traj(self.min_linear_vel, theta_vel))
 
     def _move_forward(self, pos_error=1.0, theta_error=1.0):
         future_vel_costmap = self._get_vel_based_on_costmap()
@@ -156,10 +153,7 @@ class BasicNavigation(object):
                 self.plan = None
             else:
                 rospy.logerr('ABORTING')
-                self.retry_attempts = 0
-                self.publish_zero_vel()
-                self.goal = None
-                self.moving_backward = False
+                self._reset_state()
             return
 
         future_vel_prop_raw = pos_error * self.p_linear
@@ -171,6 +165,7 @@ class BasicNavigation(object):
         theta_vel_raw = theta_error * self.p_theta
         theta_vel = Utils.clip(theta_vel_raw, self.max_theta_vel, self.min_theta_vel)
         self._cmd_vel_pub.publish(Utils.get_twist(x=x_vel, y=0.0, theta=theta_vel))
+        self._traj_pub.publish(self._get_traj(x_vel, theta_vel))
 
     def recover(self):
         rospy.loginfo('Recovering')
@@ -212,37 +207,12 @@ class BasicNavigation(object):
         :returns: None
 
         """
-        plan = []
-        req = MakeNavPlanRequest()
-        req.goal = Utils.get_pose_stamped_from_frame_x_y_theta(self.global_frame,
-                                                               *self.goal)
-        req.start = Utils.get_pose_stamped_from_frame_x_y_theta(self.global_frame,
-                                                                *self.curr_pos)
-        try:
-            response = self.call_global_planner(req)
-            if len(response.path) > 0:
-                plan = response.path
-            else:
-                rospy.logerr('Global planner failed.')
-                rospy.logerr('ABORTING')
-                self.goal = None
-                self.moving_backward = False
-                return
-        except rospy.ServiceException as e:
+        self.plan = self.global_planner_utils.get_global_plan(self.curr_pos, self.goal)
+        if self.plan is None:
             rospy.logerr('Global planner failed.')
             rospy.logerr('ABORTING')
-            self.moving_backward = False
-            rospy.logerr(str(e))
+            self._reset_state()
             return
-
-        first_pose = Utils.get_x_y_theta_from_pose(plan[0].pose)
-        second_pose = Utils.get_x_y_theta_from_pose(plan[1].pose)
-        avg_dist = Utils.get_distance_between_points(first_pose[:2], second_pose[:2])
-        index_offset = int(round(self.dist_between_wp/avg_dist))
-        self.plan = []
-        for i in range(0, len(plan), index_offset):
-            self.plan.append(plan[i])
-        self.plan.append(plan[-1])
 
         # publish path
         path_msg = Path()
@@ -306,19 +276,41 @@ class BasicNavigation(object):
         future_vel = self.max_linear_vel - (future_costmap_value * self.costmap_to_vel_multiplier)
         return future_vel
 
+    def _get_traj(self, vel_x, vel_theta):
+        path_msg = Path()
+        path_msg.header.stamp = rospy.Time.now()
+        path_msg.header.frame_id = self.robot_frame
+
+        dist = abs(vel_x) * self.future_pos_lookahead_time
+        angular_dist = abs(vel_theta) * self.future_pos_lookahead_time
+        radius = dist/angular_dist
+
+        sign_x = 1 if vel_x > 0 else -1
+        sign_theta = 1 if vel_theta > 0 else -1
+
+        num_of_points = 50
+        theta_inc = angular_dist/num_of_points
+        for i in range(num_of_points):
+            theta = i * theta_inc
+            pose = PoseStamped()
+            pose.pose.position.x = sign_x * (radius * math.sin(theta))
+            pose.pose.position.y = sign_theta * radius * (1 - math.cos(theta))
+            pose.pose.orientation.w = 1.0
+            path_msg.poses.append(pose)
+        return path_msg
+
+    def _reset_state(self):
+        self.publish_zero_vel()
+        self.goal = None
+        self.plan = None
+        self.reached_goal_once = False
+        self.moving_backward = False
+        self.retry_attempts = 0
+
+    def cancel_current_goal(self, msg):
+        rospy.logwarn('PREEMPTING (cancelled goal)')
+        self._reset_state()
+
     def publish_zero_vel(self):
         self._cmd_vel_pub.publish(Utils.get_twist())
 
-if __name__ == "__main__":
-    rospy.init_node('basic_navigation')
-    BN = BasicNavigation()
-    CONTROL_RATE = rospy.get_param('~control_rate', 1.0)
-    RATE = rospy.Rate(CONTROL_RATE)
-    try:
-        while not rospy.is_shutdown():
-            BN.run_once()
-            RATE.sleep()
-    except Exception as e:
-        rospy.logerr(str(e))
-        traceback.print_exc()
-    rospy.loginfo('Exiting.')

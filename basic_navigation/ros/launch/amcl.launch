@@ -50,6 +50,9 @@
         <param name="initial_pose_x" value="$(arg initial_pose_x)"/>
         <param name="initial_pose_y" value="$(arg initial_pose_y)"/>
         <param name="initial_pose_a" value="$(arg initial_pose_a)"/>
+        <param name="initial_cov_xx" value="0.001"/>
+        <param name="initial_cov_yy" value="0.001"/>
+        <param name="initial_cov_aa" value="0.001"/>
     </node>
 
 </launch>
