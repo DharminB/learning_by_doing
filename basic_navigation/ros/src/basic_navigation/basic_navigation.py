@@ -30,6 +30,7 @@ class BasicNavigation(object):
         self.allow_backward_motion = rospy.get_param('~allow_backward_motion', False)
         self.num_of_retries = rospy.get_param('~num_of_retries', 3)
         self.retry_attempts = 0
+        self.last_applied_vel_x = 0.0
 
         # tolerances
         self.heading_tolerance = rospy.get_param('~heading_tolerance', 0.5)
@@ -48,6 +49,9 @@ class BasicNavigation(object):
         self.min_theta_vel = rospy.get_param('~min_theta_vel', 0.005)
         self.max_linear_vel = rospy.get_param('~max_linear_vel', 0.3)
         self.min_linear_vel = rospy.get_param('~min_linear_vel', 0.1)
+        max_linear_acc_per_second = rospy.get_param('~max_linear_acc', 0.2)
+        control_rate = rospy.get_param('~control_rate', 5.0)
+        self.max_linear_acc = max_linear_acc_per_second/control_rate
         self.future_pos_lookahead_dist = rospy.get_param('~future_pos_lookahead_dist', 0.4)
         self.future_pos_lookahead_time = rospy.get_param('~future_pos_lookahead_time', 3.0)
 
@@ -135,6 +139,7 @@ class BasicNavigation(object):
             self._move_forward(pos_error=dist, theta_error=heading_diff)
 
     def _rotate_in_place(self, theta_error=1.0):
+        self.last_applied_vel_x = 0.0
         theta_vel_raw = theta_error * self.p_theta_in_place
         theta_vel = Utils.clip(theta_vel_raw, self.max_theta_vel, self.min_theta_vel)
         self._cmd_vel_pub.publish(Utils.get_twist(x=0.0, y=0.0, theta=theta_vel))
@@ -159,7 +164,15 @@ class BasicNavigation(object):
         future_vel_prop_raw = pos_error * self.p_linear
         future_vel_prop = Utils.clip(future_vel_prop_raw, self.max_linear_vel, self.min_linear_vel)
 
-        x_vel = min(future_vel_costmap, future_vel_prop)
+        desired_x_vel = min(future_vel_costmap, future_vel_prop)
+
+        # ramp up the vel acc. to max_linear_acc
+        if desired_x_vel > self.last_applied_vel_x + self.max_linear_acc:
+            x_vel = self.last_applied_vel_x + self.max_linear_acc
+        else:
+            x_vel = desired_x_vel
+        self.last_applied_vel_x = x_vel
+
         if self.moving_backward:
             x_vel *= -1
         theta_vel_raw = theta_error * self.p_theta
@@ -288,7 +301,7 @@ class BasicNavigation(object):
         sign_x = 1 if vel_x > 0 else -1
         sign_theta = 1 if vel_theta > 0 else -1
 
-        num_of_points = 50
+        num_of_points = 10
         theta_inc = angular_dist/num_of_points
         for i in range(num_of_points):
             theta = i * theta_inc
@@ -306,11 +319,13 @@ class BasicNavigation(object):
         self.reached_goal_once = False
         self.moving_backward = False
         self.retry_attempts = 0
+        self.last_applied_vel_x = 0.0
 
     def cancel_current_goal(self, msg):
         rospy.logwarn('PREEMPTING (cancelled goal)')
         self._reset_state()
 
     def publish_zero_vel(self):
+        self.last_applied_vel_x = 0.0
         self._cmd_vel_pub.publish(Utils.get_twist())
 
