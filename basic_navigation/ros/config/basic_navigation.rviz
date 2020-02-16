@@ -5,6 +5,7 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /Basic navigation1
+        - /Path1
       Splitter Ratio: 0.676470578
     Tree Height: 470
   - Class: rviz/Selection
@@ -198,7 +199,7 @@ Visualization Manager:
             Y: 0
             Z: 0
           Pose Color: 0; 170; 0
-          Pose Style: None
+          Pose Style: Axes
           Radius: 0.0299999993
           Shaft Diameter: 0.100000001
           Shaft Length: 0.100000001
@@ -239,11 +240,11 @@ Visualization Manager:
           Class: rviz/Pose
           Color: 255; 25; 0
           Enabled: true
-          Head Length: 0.300000012
-          Head Radius: 0.100000001
+          Head Length: 0.100000001
+          Head Radius: 0.0500000007
           Name: Goal
-          Shaft Length: 1
-          Shaft Radius: 0.0500000007
+          Shaft Length: 0.5
+          Shaft Radius: 0.0299999993
           Shape: Arrow
           Topic: /move_base_simple/goal
           Unreliable: false
@@ -273,6 +274,29 @@ Visualization Manager:
           Value: true
       Enabled: true
       Name: Basic navigation
+    - Alpha: 1
+      Buffer Length: 1
+      Class: rviz/Path
+      Color: 0; 0; 127
+      Enabled: true
+      Head Diameter: 0.300000012
+      Head Length: 0.200000003
+      Length: 0.300000012
+      Line Style: Lines
+      Line Width: 0.0299999993
+      Name: Path
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0
+      Pose Color: 255; 85; 255
+      Pose Style: Axes
+      Radius: 0.0299999993
+      Shaft Diameter: 0.100000001
+      Shaft Length: 0.100000001
+      Topic: /basic_navigation/path_debug
+      Unreliable: false
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48

@@ -103,6 +103,17 @@ class Utils(object):
         return reverse_angle
 
     @staticmethod
+    def get_line_angle(point1, point2):
+        """Calculate the angle made by 2 points
+
+        :point1: tuple of 2 floats
+        :point2: tuple of 2 floats
+        :returns: float
+
+        """
+        return math.atan2(point2[1] - point1[1], point2[0] - point1[0])
+
+    @staticmethod
     def get_distance(delta_x, delta_y):
         """Compute cartesian distance given individual distance in x and y axis
 

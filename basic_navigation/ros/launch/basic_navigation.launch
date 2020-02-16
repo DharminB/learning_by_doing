@@ -16,7 +16,7 @@
     </node>
 
     <!-- global planner will also launch global costmap -->
-    <node pkg="global_planner" name="global_planner" type="planner" output="screen" >
+    <node pkg="navfn" name="global_planner" type="navfn_node" output="screen" >
         <rosparam command="load" ns="costmap"
                   file="$(find basic_navigation)/ros/config/common_costmap_params.yaml"/>
         <rosparam command="load" ns="costmap"

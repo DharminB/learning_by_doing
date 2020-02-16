@@ -123,7 +123,7 @@ class BasicNavigation(object):
             rospy.loginfo('Reached waypoint')
             self.plan.pop(0)
 
-        heading = math.atan2(curr_goal[1]-self.curr_pos[1], curr_goal[0]-self.curr_pos[0])
+        heading = Utils.get_line_angle(self.curr_pos[:2], curr_goal[:2])
         heading_diff = Utils.get_shortest_angle(heading, self.curr_pos[2])
         if self.allow_backward_motion:
             heading_diff_backward = Utils.get_shortest_angle(heading,
