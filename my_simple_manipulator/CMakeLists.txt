@@ -10,6 +10,7 @@ find_package(catkin REQUIRED COMPONENTS
   kdl_parser
   tf
   kdl_conversions
+  youbot_arm_kinematics
 )
 
 ## System dependencies are found with CMake's conventions
@@ -37,7 +38,10 @@ add_executable(arm_controller
     ros/src/arm_controller.cpp
     ros/src/pid_controller.cpp
     ros/src/kinematics.cpp)
+add_executable(youbot_kinematics
+    ros/src/youbot_kinematics.cpp)
 
 target_link_libraries(test_node ${catkin_LIBRARIES})
 target_link_libraries(arm_controller_without_gazebo ${catkin_LIBRARIES})
 target_link_libraries(arm_controller ${catkin_LIBRARIES})
+target_link_libraries(youbot_kinematics ${catkin_LIBRARIES})
