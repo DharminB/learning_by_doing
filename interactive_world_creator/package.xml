@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>interactive_world_creator</name>
+  <version>0.1.0</version>
+  <description>Create xacro files containing walls for gazebo simulator by using
+  RViz and its interactive markers</description>
+
+  <maintainer email="dharmingeo@gmail.com">Dharmin B.</maintainer>
+
+  <license>GPLv3</license>
+
+  <author email="dharmingeo@gmail.com">Dharmin B.</author>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+</package>

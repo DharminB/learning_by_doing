@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<launch>
+    <arg name="world_model_name" default="test"/>
+
+    <arg name="paused" default="true"/>
+    <arg name="gui" default="true"/>
+    <arg name="debug" value="false" />
+
+    <!-- Start Gazebo with empty world -->
+	<include file="$(find gazebo_ros)/launch/empty_world.launch">
+		<arg name="debug" value="$(arg debug)" />
+		<arg name="gui" value="$(arg gui)" />
+		<arg name="paused" value="$(arg paused)"/>
+		<arg name="use_sim_time" value="true"/>
+	</include>
+
+    <!-- Spawn world model -->
+    <group>
+        <arg name="world_model"
+             default="$(find interactive_world_creator)/description/$(arg world_model_name).xacro"/>
+        <param name="world_description"
+               command="rosrun xacro xacro --inorder '$(arg world_model)'" />
+
+        <!-- spawn uploaded world model -->
+        <node pkg="gazebo_ros" name="gazebo_world_model" type="spawn_model"
+              respawn="false" output="screen"
+              args="-urdf -param world_description -model world -x 0.0 -y 0.0 -z 0.0" />
+    </group>
+
+
+
+</launch>
