@@ -5,6 +5,7 @@ import math
 import rospy
 from geometry_msgs.msg import PoseStamped, Pose, TransformStamped, Quaternion
 from geometry_msgs.msg import Twist
+from visualization_msgs.msg import Marker, InteractiveMarker, InteractiveMarkerControl
 
 class Utils(object):
 
@@ -56,7 +57,7 @@ class Utils(object):
         return (pose.position.x, pose.position.y, theta)
 
     @staticmethod
-    def get_2_dof_interactive_marker(marker_name, frame, x=0.0, y=0.0):
+    def get_3_dof_interactive_marker(marker_name, frame, x=0.0, y=0.0, theta=0.0):
         """Return an interactive marker with 2 degree of freedom (X and Y axis)
         in `frame` at (`x`, `y`, 0.0) position named `name`
 
@@ -73,38 +74,33 @@ class Utils(object):
         int_marker.name = marker_name
         int_marker.pose.position.x = x
         int_marker.pose.position.y = y
-        # int_marker.description = "Simple 2-DOF Control"
+        quat = tf.transformations.quaternion_from_euler(0.0, 0.0, theta)
+        int_marker.pose.orientation = Quaternion(*quat)
+        int_marker.description = marker_name
 
-        # create a grey box marker
+        # create a white box marker
         box_marker = Marker()
-        box_marker.type = Marker.SPHERE
-        box_marker.scale.x = box_marker.scale.y = box_marker.scale.z = 0.1
-        box_marker.color.r = box_marker.color.a = 1.0
-        box_marker.color.g = box_marker.color.b = 0.0
+        box_marker.type = Marker.CUBE
+        box_marker.scale.x = 1.0
+        box_marker.scale.y = 0.1
+        box_marker.scale.z = 1.0
+        box_marker.color.r = box_marker.color.a = box_marker.color.g = box_marker.color.b = 1.0
+        box_marker.pose.position.z = -0.5
+        box_marker.pose.orientation.w = 1.0
 
         # create a non-interactive control which contains the box
         box_control = InteractiveMarkerControl()
         box_control.always_visible = True
-        box_control.markers.append( box_marker )
+        box_control.markers.append(box_marker)
+        box_control.name = "move_x_y"
+        box_control.interaction_mode = InteractiveMarkerControl.MOVE_PLANE
+        box_control.orientation.w = box_control.orientation.y = 1.0
+        int_marker.controls.append(box_control)
 
-        # add the control to the interactive marker
-        int_marker.controls.append( box_control )
-
-        # create a control which will move the box
-        # this control does not contain any markers,
-        # which will cause RViz to insert two arrows
         rotate_control = InteractiveMarkerControl()
-        rotate_control.name = "move_x"
-        rotate_control.interaction_mode = InteractiveMarkerControl.MOVE_AXIS
-
-        # add the control to the interactive marker
+        rotate_control.name = "rotate_z"
+        rotate_control.interaction_mode = InteractiveMarkerControl.ROTATE_AXIS
+        rotate_control.orientation.y = rotate_control.orientation.w = 1.0
         int_marker.controls.append(rotate_control);
 
-        rotate_control2 = InteractiveMarkerControl()
-        rotate_control2.orientation.z = rotate_control2.orientation.w = 0.707
-        rotate_control2.name = "move_y"
-        rotate_control2.interaction_mode = InteractiveMarkerControl.MOVE_AXIS
-
-        # add the control to the interactive marker
-        int_marker.controls.append(rotate_control2);
         return int_marker

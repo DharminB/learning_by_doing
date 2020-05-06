@@ -1,0 +1,75 @@
+#! /usr/bin/env python
+
+from __future__ import print_function
+
+import rospy
+
+from geometry_msgs.msg import Point, PoseStamped, PointStamped
+from visualization_msgs.msg import MarkerArray, Marker, InteractiveMarker, InteractiveMarkerControl
+
+from interactive_markers.interactive_marker_server import InteractiveMarkerServer, InteractiveMarkerFeedback
+from interactive_world_creator.utils import Utils
+
+class InteractiveWorldCreator(object):
+
+    """TODO"""
+
+    def __init__(self):
+        self._frame = rospy.get_param('~frame', 'world')
+
+        self._marker_id_counter = 0
+        self._original_position_dict = {}
+
+        # self._waypoints_pub = rospy.Publisher('/waypoints_marker', MarkerArray, queue_size=1)
+        rospy.Subscriber('/goal', PoseStamped, self._nav_goal_cb)
+        self._interactive_marker_server = InteractiveMarkerServer("walls")
+
+        rospy.sleep(1.0)
+        rospy.loginfo("Initialised")
+
+    def save(self):
+        for i in range(1, self._marker_id_counter+1):
+            print('wall_' + str(i))
+
+    def _add_interactive_marker(self, x=0.0, y=0.0, theta=0.0):
+        """adds a interactive marker at the position.
+
+        :returns: None
+
+        """
+        self._marker_id_counter += 1
+        marker = Utils.get_3_dof_interactive_marker('wall_'+str(self._marker_id_counter),
+                                                    self._frame, x, y, theta)
+        self._interactive_marker_server.insert(marker, self._interactive_marker_cb)
+        self._interactive_marker_server.applyChanges()
+
+    def _interactive_marker_cb(self, feedback):
+        """Updates the control point when interactive marker is moved.
+
+        :feedback: InteractiveMarkerFeedback
+        :returns: None
+
+        """
+        if feedback.event_type != InteractiveMarkerFeedback.MOUSE_UP:
+            return
+        x, y, theta = Utils.get_x_y_theta_from_pose(feedback.pose)
+        print(feedback.marker_name + " is now at " + str(x) + ", " + str(y) + ", " + str(theta))
+
+
+    def _nav_goal_cb(self, msg):
+        """Callback for rviz's publish point messages
+
+        :msg: geometry_msgs.PointStamped
+        :returns: None
+
+        """
+        x, y, theta = Utils.get_x_y_theta_from_pose(msg.pose)
+        print(x, y, theta)
+        self._add_interactive_marker(x, y, theta)
+
+if __name__ == "__main__":
+    rospy.init_node('creator')
+    GE = InteractiveWorldCreator()
+    rospy.spin()
+    GE.save()
+    rospy.loginfo('Exiting.')

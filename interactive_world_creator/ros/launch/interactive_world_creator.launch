@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+
+<launch>
+
+    <arg name="world_file" default="$(find interactive_world_creator)/description/test.xacro"/>
+
+    <!-- gui editor node -->
+    <node pkg="interactive_world_creator" name="creator" type="creator" output="screen">
+        <param name="world_file" type="str" value="$(arg world_file)"/>
+    </node>
+
+    <!-- rviz for visualisation -->
+    <node pkg="rviz" name="creator_rviz" type="rviz"
+          args="-d $(find interactive_world_creator)/ros/config/creator.rviz" />
+
+</launch>
