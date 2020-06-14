@@ -6,8 +6,8 @@
 #include <sensor_msgs/JointState.h>
 #include <sensor_msgs/ChannelFloat32.h>
 #include <geometry_msgs/PointStamped.h>
+#include <geometry_msgs/Vector3.h>
 
-#include <tf/transform_datatypes.h>
 #include <urdf/model.h>
 
 #include <pid_controller.cpp>
@@ -21,38 +21,36 @@ class ArmController
         void update();
 
     private:
-        int control_rate;
+        float control_rate_;
 
         size_t num_of_joints_;
-        sensor_msgs::JointState joint_state_msg;
-        std::vector<std::string> joint_names;
-        std::vector<double> joint_lower_limits;
-        std::vector<double> joint_upper_limits;
-        Kinematics kinematics;
-        int cart_vel_countdown, cart_vel_countdown_start = 10;
+        std::vector<double> joint_lower_limits_;
+        std::vector<double> joint_upper_limits_;
+        boost::shared_ptr<Kinematics> kinematics_;
+        int cart_vel_countdown_, cart_vel_countdown_start_ = 10;
 
-        std::vector<double> target_joint_positions;
-        std::vector<double> target_joint_velocities;
-        std::vector<double> current_joint_positions;
-        std::vector<double> current_joint_velocities;
-        std::vector<PIDController> position_controllers;
+        std::vector<double> target_joint_positions_;
+        std::vector<double> target_joint_velocities_;
+        std::vector<double> current_joint_positions_;
+        std::vector<double> current_joint_velocities_;
+        std::vector<PIDController> position_controllers_;
 
         /* pid related variables */
-        double proportional_factor = 2.0;
-        double integral_factor = 0.001;
-        double differential_factor = 0.2;
-        double i_clamp = 2.0;
-        double position_threshold = 0.001;
-        double max_vel = 0.5;
-        double min_vel = 0.0001;
+        float proportional_factor_;
+        float integral_factor_;
+        float differential_factor_;
+        float i_clamp_;
+        float position_tolerance_;
+        float max_vel_;
+        float min_vel_;
 
-        ros::NodeHandle nh;
-        std::vector<ros::Publisher> joint_vel_pubs;
-        ros::Subscriber point_command_sub;
-        ros::Subscriber position_command_sub;
-        ros::Subscriber cart_vel_command_sub;
-        ros::Subscriber velocity_command_sub;
-        ros::Subscriber joint_state_sub;
+        ros::NodeHandle nh_;
+        std::vector<ros::Publisher> joint_vel_pubs_;
+        ros::Subscriber point_command_sub_;
+        ros::Subscriber position_command_sub_;
+        ros::Subscriber cart_vel_command_sub_;
+        ros::Subscriber velocity_command_sub_;
+        ros::Subscriber joint_state_sub_;
 
         void CartVelCommandCb(const geometry_msgs::Vector3::ConstPtr& msg);
 

@@ -4,18 +4,18 @@
 class PIDController
 {
     private:
-        double delta_time;
-        double proportional_factor;
-        double integral_factor;
-        double differential_factor;
-        double tolerance;
-        double i_clamp;
-        double integral_sum = 0.0;
-        double prev_error = 0.0;
+        float delta_time;
+        float proportional_factor;
+        float integral_factor;
+        float differential_factor;
+        float tolerance;
+        float i_clamp;
+        float integral_sum = 0.0;
+        float prev_error = 0.0;
 
     public:
-        PIDController(double proportional, double integral, double differential,
-                      double control_time, double tolerance, double i_clamp)
+        PIDController(float proportional, float integral, float differential,
+                      float control_time, float tolerance, float i_clamp)
         {
             this->proportional_factor = proportional;
             this->integral_factor = integral;
@@ -25,16 +25,16 @@ class PIDController
             this->i_clamp = i_clamp;
         };
         
-        double control(double current, double target)
+        float control(float current, float target)
         {
-            double current_error = target - current;
+            float current_error = target - current;
             if (fabs(current_error) < this->tolerance)
                 return 0.0;
             this->integral_sum += current_error * this->delta_time;
             this->integral_sum = fmax(-1.0 * this->i_clamp, fmin(this->i_clamp, this->integral_sum));
-            double change_in_error = (current_error - this->prev_error) / this->delta_time;
+            float change_in_error = (current_error - this->prev_error) / this->delta_time;
             this->prev_error = current_error;
-            double control_value = this->proportional_factor * current_error
+            float control_value = this->proportional_factor * current_error
                                     + this -> integral_factor * this->integral_sum
                                     + this->differential_factor * change_in_error;
             /* std::cout << "current_error " << current_error << std::endl; */
