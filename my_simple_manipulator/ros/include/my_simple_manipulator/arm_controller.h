@@ -10,7 +10,7 @@
 
 #include <urdf/model.h>
 
-#include <pid_controller.cpp>
+#include <my_simple_manipulator/pid_controller.h>
 #include <my_simple_manipulator/kinematics.h>
 
 class ArmController
