@@ -1,107 +1,30 @@
+#include <my_simple_manipulator/arm_controller.h>
+
 #include <algorithm>
 #include <math.h>
-
-#include <ros/ros.h>
-
-#include <sensor_msgs/JointState.h>
-#include <sensor_msgs/ChannelFloat32.h>
-#include <geometry_msgs/PointStamped.h>
 #include <std_msgs/Float64.h>
 
-#include <tf/transform_datatypes.h>
-#include <urdf/model.h>
-
-#include <kdl_parser/kdl_parser.hpp>
-#include <kdl/kdl.hpp>
-#include <kdl/frames.hpp>
-#include <kdl/jntarray.hpp>
-#include <kdl_conversions/kdl_msg.h>
-
-#include <pid_controller.cpp>
-#include <kinematics.cpp>
-
-class ArmController
-{
-    public:
-        ArmController(KDL::Chain &chain, int control_rate);
-        void publishZeroVelocity();
-        void update();
-
-    private:
-        int control_rate;
-
-        KDL::Chain my_chain;
-        sensor_msgs::JointState joint_state_msg;
-        std::vector<std::string> joint_names;
-        std::vector<double> joint_lower_limits;
-        std::vector<double> joint_upper_limits;
-        Kinematics kinematics;
-        int cart_vel_countdown, cart_vel_countdown_start = 10;
-
-        std::vector<double> target_joint_positions;
-        std::vector<double> target_joint_velocities;
-        std::vector<double> current_joint_positions;
-        std::vector<double> current_joint_velocities;
-        std::vector<PIDController> position_controllers;
-
-        /* pid related variables */
-        double proportional_factor = 2.0;
-        double integral_factor = 0.001;
-        double differential_factor = 0.2;
-        double i_clamp = 2.0;
-        double position_threshold = 0.001;
-        double max_vel = 0.5;
-        double min_vel = 0.0001;
-
-        ros::NodeHandle nh;
-        std::vector<ros::Publisher> joint_vel_pubs;
-        ros::Subscriber point_command_sub;
-        ros::Subscriber position_command_sub;
-        ros::Subscriber cart_vel_command_sub;
-        ros::Subscriber velocity_command_sub;
-        ros::Subscriber joint_state_sub;
-
-        /*
-         * get the name of the segment which has no children
-         * Assumption: manipulator has single chain. No segment has more than 1 child
-         */
-        /* std::string getEndEffector(KDL::Tree tree); */
-
-        void CartVelCommandCb(const geometry_msgs::Vector3::ConstPtr& msg);
-
-        void pointCommandCb(const geometry_msgs::PointStamped::ConstPtr& msg);
-
-        void positionCommandCb(const sensor_msgs::ChannelFloat32::ConstPtr& msg);
-
-        void velocityCommandCb(const sensor_msgs::ChannelFloat32::ConstPtr& msg);
-
-        void jointStateCb(const sensor_msgs::JointState::ConstPtr& msg);
-
-        void publishJointVelocity(int joint_index, double joint_vel);
-
-        void initialiseJoints();
-};
-
-ArmController::ArmController(KDL::Chain &chain, int control_rate):
+ArmController::ArmController():
     nh("~"),
-    my_chain(chain),
-    kinematics(chain)
+    /* my_chain(chain), */
+    kinematics(0.4, 0.6, 0.4)
 {
-    this->control_rate = control_rate;
+    this->control_rate = 10;
+    num_of_joints_ = 3;
 
     /* get the names and limits of all joints */
     initialiseJoints();
 
     /* create template message with zero joint angles */
     joint_state_msg.name = joint_names;
-    for (int i = 0; i < joint_names.size(); i++)
+    for (int i = 0; i < num_of_joints_; i++)
     {
         joint_state_msg.position.push_back(0.0);
         joint_state_msg.velocity.push_back(0.0);
     }
 
     /* initialise publisher and subscribers */
-    for (int i = 0; i < joint_names.size(); i++)
+    for (int i = 0; i < num_of_joints_; i++)
     {
         std::string topic_name = "/joint" + std::to_string(i+1) + "_velocity/command";
         ros::Publisher joint_vel_pub = nh.advertise<std_msgs::Float64> (topic_name, 1);
@@ -124,17 +47,12 @@ ArmController::ArmController(KDL::Chain &chain, int control_rate):
                                          &ArmController::velocityCommandCb, this);
 
     this->kinematics.setJointLimits(this->joint_lower_limits, this->joint_upper_limits);
-    this->cart_vel_countdown = 0;
-    /* std::vector<double> joints({0.0, 1.0, 0.0}); */
-    /* double x, y, z; */
-    /* this->kinematics.findFK(joints, x, y, z); */
-    /* std::cout << x << " " << y << " " << z << std::endl; */
 }
 
 void ArmController::update()
 {
     bool moved_arm_using_pos_cmd = false;
-    for (int i = 0; i < this->joint_names.size(); i++)
+    for (int i = 0; i < num_of_joints_; i++)
     {
         /* std::cout << this->current_joint_positions[i] << std::endl; */
         if (this->target_joint_positions.size() > 0)
@@ -163,7 +81,7 @@ void ArmController::update()
         {
             ROS_WARN_STREAM("Joint value for " << this->joint_names[i]
                             << " is out of limit! Stopping motion.");
-            std::cout << "Joint value out of limit. Stopping motion" << std::endl;
+            std::cerr << "Joint value out of limit. Stopping motion" << std::endl;
             this->publishJointVelocity(i, 0.0);
         }
     }
@@ -193,14 +111,14 @@ void ArmController::update()
 void ArmController::jointStateCb(const sensor_msgs::JointState::ConstPtr& msg)
 {
     /* ROS_INFO_STREAM(*msg); */
-    if (msg->name.size() != this->joint_names.size())
+    if (msg->name.size() != num_of_joints_)
     {
         ROS_WARN_STREAM("Number of joints mismatch! Expecting " 
-                        << this->joint_names.size() << " values.");
-        std::cout << "Number of joint mismatch" << std::endl;
+                        << num_of_joints_ << " values.");
+        std::cerr << "Number of joint mismatch" << std::endl;
         return;
     }
-    for (int i = 0; i < msg->position.size(); i++)
+    for (int i = 0; i < num_of_joints_; i++)
     {
         this->current_joint_positions[i] = msg->position[i];
         this->current_joint_velocities[i] = msg->velocity[i];
@@ -213,14 +131,14 @@ void ArmController::pointCommandCb(const geometry_msgs::PointStamped::ConstPtr& 
     if (msg->header.frame_id != "base_link")
     {
         ROS_WARN_STREAM("Frame should be base_link. Ignoring.");
-        std::cout << "Frame shoud be base_link" << std::endl;
+        std::cerr << "Frame shoud be base_link" << std::endl;
         return;
     }
     /* check for ground */
     if (msg->point.z < 0.05)
     {
         ROS_WARN_STREAM("Target point below ground. Ignoring.");
-        std::cout << "Target point is below ground. Ignoring." << std::endl;
+        std::cerr << "Target point is below ground. Ignoring." << std::endl;
         return;
     }
     std::vector<double> joint_pos;
@@ -237,7 +155,7 @@ void ArmController::pointCommandCb(const geometry_msgs::PointStamped::ConstPtr& 
         this->target_joint_velocities.clear();
 
         std::cout << "IK solution:";
-        for (double i = 0; i < joint_pos.size(); ++i)
+        for (double i = 0; i < num_of_joints_; ++i)
         {
             this->target_joint_positions.push_back(joint_pos[i]);
             this->position_controllers[i].reset();
@@ -248,7 +166,7 @@ void ArmController::pointCommandCb(const geometry_msgs::PointStamped::ConstPtr& 
     else
     {
         ROS_WARN_STREAM("Could not find a valid IK solution!");
-        std::cout << "Could not find a valid IK solution" << std::endl;
+        std::cerr << "Could not find a valid IK solution" << std::endl;
     }
 }
 
@@ -256,15 +174,15 @@ void ArmController::positionCommandCb(const sensor_msgs::ChannelFloat32::ConstPt
 {
     std::cout << *msg;
     /* check for number of values provided */
-    if (msg->values.size() != this->joint_names.size())
+    if (msg->values.size() != num_of_joints_)
     {
         ROS_WARN_STREAM("Number of joints mismatch! Expecting " 
-                        << this->joint_names.size() << " values.");
-        std::cout << "Number of joint mismatch" << std::endl;
+                        << num_of_joints_ << " values.");
+        std::cerr << "Number of joint mismatch" << std::endl;
         return;
     }
     /* check for joint limits */
-    for (int i = 0; i < msg->values.size(); i++)
+    for (int i = 0; i < num_of_joints_; i++)
     {
         if (msg->values[i] < this->joint_lower_limits[i] 
                 || msg->values[i] > this->joint_upper_limits[i])
@@ -273,14 +191,14 @@ void ArmController::positionCommandCb(const sensor_msgs::ChannelFloat32::ConstPt
                             << " is out of limit! Expecting values between "
                             << this->joint_lower_limits[i] << " and "
                             << this->joint_upper_limits[i] << ".");
-            std::cout << "Joint value out of limit" << std::endl;
+            std::cerr << "Joint value out of limit" << std::endl;
             return;
         }
     }
     /* set target joint positions and reset target joint vel */
     this->target_joint_positions.clear();
     this->target_joint_velocities.clear();
-    for (int i = 0; i < this->joint_names.size(); i++)
+    for (int i = 0; i < num_of_joints_; i++)
     {
         this->target_joint_positions.push_back(msg->values[i]);
         this->position_controllers[i].reset();
@@ -324,14 +242,14 @@ void ArmController::velocityCommandCb(const sensor_msgs::ChannelFloat32::ConstPt
 {
     std::cout << *msg;
     /* check for number of values provided */
-    if (msg->values.size() != this->joint_names.size())
+    if (msg->values.size() != num_of_joints_)
     {
         ROS_WARN_STREAM("Number of joints mismatch! Expecting " 
-                        << this->joint_names.size() << " values.");
+                        << num_of_joints_ << " values.");
         return;
     }
     /* check for joint limits */
-    for (int i = 0; i < msg->values.size(); i++)
+    for (int i = 0; i < num_of_joints_; i++)
     {
         if (msg->values[i] < -1 * this->max_vel
                 || msg->values[i] > this->max_vel)
@@ -355,7 +273,7 @@ void ArmController::velocityCommandCb(const sensor_msgs::ChannelFloat32::ConstPt
 
 void ArmController::publishZeroVelocity()
 {
-    for (int i = 0; i < this->my_chain.getNrOfJoints(); ++i) {
+    for (int i = 0; i < num_of_joints_; ++i) {
         this->publishJointVelocity(i, 0.0);
     }
 }
@@ -370,11 +288,9 @@ void ArmController::publishJointVelocity(int joint_index, double joint_vel)
 
 void ArmController::initialiseJoints()
 {
-    for (KDL::Segment seg : this->my_chain.segments)
+    for (int i = 0; i < num_of_joints_; ++i)
     {
-        KDL::Joint joint = seg.getJoint();
-        if (joint.getType() == KDL::Joint::JointType::None) continue;
-        this->joint_names.push_back(joint.getName());
+        this->joint_names.push_back("joint"+std::to_string(i+1));
     }
     urdf::Model model;
     if (!model.initParam("/robot_description"))
@@ -416,56 +332,11 @@ void ArmController::initialiseJoints()
     }
 }
 
-/* ======================================================================== */
-/* ======================================================================== */
-
-std::string getEndEffector(KDL::Tree tree)
-{
-    std::string end_effector_name;
-    KDL::SegmentMap sm = tree.getSegments();
-    for (auto segment : sm)
-    {
-        auto children = segment.second.children;
-        if (children.size() == 0)
-        {
-            end_effector_name = segment.first;
-            break;
-        }
-    }
-    return end_effector_name;
-}
-
-KDL::Chain getChainFromParam(std::string param_name)
-{
-    KDL::Tree my_tree;
-    if (!kdl_parser::treeFromParam(param_name, my_tree))
-    {
-        ROS_ERROR("Failed to construct kdl tree. Exiting.");
-        exit(1);
-    }
-
-    /* create chain from tree */
-    std::string base_name = my_tree.getRootSegment()->first;
-    std::string ee_name = getEndEffector(my_tree);
-
-    KDL::Chain my_chain;
-    if (!my_tree.getChain(base_name, ee_name, my_chain))
-    {
-        ROS_ERROR("Failed to construct chain from tree. Exiting.");
-        exit(1);
-    }
-
-    ROS_INFO_STREAM("Successfully created kdl chain");
-    std::cout << my_chain.getNrOfJoints() << " joints found." << std::endl;
-    return my_chain;
-}
-
-int main(int argc, char *argv[])
+int main(int argc, char **argv)
 {
     ros::init(argc, argv, "arm_controller");
-    KDL::Chain my_chain = getChainFromParam("/robot_description");
     int control_rate = 10;
-    ArmController arm_controller(my_chain, control_rate);
+    ArmController arm_controller;
 
     ros::Rate rate(control_rate);
     while (ros::ok())
@@ -476,6 +347,5 @@ int main(int argc, char *argv[])
     }
     arm_controller.publishZeroVelocity();
     std::cout << "Exiting." << std::endl;
-
     return 0;
 }
