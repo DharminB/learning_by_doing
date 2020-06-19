@@ -207,7 +207,7 @@ void ArmController::CartVelCommandCb(const geometry_msgs::Vector3::ConstPtr& msg
             out_vel[i] = 0.0;
         if (fabs(out_vel[i]) > max_vel_)
         {
-            std::cout << "Calculated velocity exceeded max vel. Ignoring." << std::endl;
+            ROS_WARN_STREAM("Calculated velocity exceeded max vel. Ignoring.");
             return;
         }
     }
