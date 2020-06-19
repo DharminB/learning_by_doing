@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<launch>
+
+    <node pkg="my_simple_manipulator" type="arm_controller" name="arm_controller" output="screen">
+        <param name="control_rate"          type="double" value="10.0"/>
+        <param name="num_of_joints"         type="int"    value="3"/>
+        <param name="proportional_factor"   type="double" value="2.0"/>
+        <param name="integral_factor"       type="double" value="0.001"/>
+        <param name="differential_factor"   type="double" value="0.2"/>
+        <param name="i_clamp"               type="double" value="2.0"/>
+        <param name="position_tolerance"    type="double" value="0.001"/>
+        <param name="max_vel"               type="double" value="0.5"/>
+        <param name="min_vel"               type="double" value="0.0001"/>
+        <param name="link_length_1"         type="double" value="0.4"/>
+        <param name="link_length_2"         type="double" value="0.6"/>
+        <param name="link_length_3"         type="double" value="0.4"/>
+        <rosparam param="lower_joint_limits">[-3.1, -2.1, -2.0]</rosparam>
+        <rosparam param="upper_joint_limits">[3.1, 2.1, 2.0]</rosparam>
+        <param name="cart_vel_valid_msg_duration" type="double" value="0.5"/>
+    </node>
+
+</launch>

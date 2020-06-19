@@ -3,6 +3,7 @@
 
 #include <ros/ros.h>
 
+#include <std_msgs/Empty.h>
 #include <sensor_msgs/JointState.h>
 #include <sensor_msgs/ChannelFloat32.h>
 #include <geometry_msgs/PointStamped.h>
@@ -27,7 +28,9 @@ class ArmController
         std::vector<double> joint_lower_limits_;
         std::vector<double> joint_upper_limits_;
         boost::shared_ptr<Kinematics> kinematics_;
-        int cart_vel_countdown_, cart_vel_countdown_start_ = 10;
+        ros::Time last_cart_vel_msg_time_;
+        ros::Duration cart_vel_valid_msg_duration_;
+        bool cart_vel_set_;
 
         std::vector<double> target_joint_positions_;
         std::vector<double> target_joint_velocities_;
@@ -35,12 +38,6 @@ class ArmController
         std::vector<double> current_joint_velocities_;
         std::vector<PIDController> position_controllers_;
 
-        /* pid related variables */
-        float proportional_factor_;
-        float integral_factor_;
-        float differential_factor_;
-        float i_clamp_;
-        float position_tolerance_;
         float max_vel_;
         float min_vel_;
 
@@ -51,6 +48,7 @@ class ArmController
         ros::Subscriber cart_vel_command_sub_;
         ros::Subscriber velocity_command_sub_;
         ros::Subscriber joint_state_sub_;
+        ros::Subscriber cancel_sub_;
 
         void CartVelCommandCb(const geometry_msgs::Vector3::ConstPtr& msg);
 
@@ -62,8 +60,8 @@ class ArmController
 
         void jointStateCb(const sensor_msgs::JointState::ConstPtr& msg);
 
-        void publishJointVelocity(int joint_index, double joint_vel);
+        void cancelCb(const std_msgs::Empty::ConstPtr& msg);
 
-        void initialiseJoints();
+        void publishJointVelocity(int joint_index, double joint_vel);
 };
 #endif

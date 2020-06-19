@@ -24,11 +24,11 @@ def main(stdscr):
     stdscr.nodelay(True)
     current_joint = 0
     strings = ['Press Ctrl-c to exit',
-               'Press A / D to decrease or increase current joint\'s angle',
-               'Press W / S to move between joints',
+               'Press A / D to move between joints',
+               'Press W / S to decrease or increase current joint\'s angle',
+               'Press Space to stop motion',
                'Current joint number: ']
-    prev_vel = 0.0
-    user_input = [-1]*5 # a queue of user input keys
+    vel = None
     while not rospy.is_shutdown():
         c = stdscr.getch()
         # stdscr.clear()
@@ -37,34 +37,28 @@ def main(stdscr):
         strings[-1] = "Current joint number: " + str(current_joint+1) + " / " + str(NUM_OF_JOINTS)
         for i, string in enumerate(strings):
             stdscr.addstr(maxy-miny-(len(strings)-i+1), 0, string)
-        if c == ord('w') :
+        if c == ord('d'):
             current_joint += 1
             current_joint %= NUM_OF_JOINTS
-        elif c == ord('s') :
+        elif c == ord('a'):
             current_joint -= 1
             current_joint %= NUM_OF_JOINTS
-
-        user_input.pop(0)
-        user_input.append(c)
-        # stdscr.addstr(maxy-miny-1, 0, ' '*30)
-        # stdscr.addstr(maxy-miny-1, 0, str(user_input))
-
-        if ord('a') in user_input:
-            vel = -0.1
-        elif ord('d') in user_input:
+        elif c == ord('w'):
             vel = 0.1
-        else:
+        elif c == ord('s'):
+            vel = -0.1
+        elif c == ord(' '):
             vel = 0.0
+        else:
+            vel = None
 
         # stdscr.addstr(maxy-miny-10, 0, str(vel)+" "+str(prev_vel))
 
-        if vel != prev_vel:
+        if vel is not None:
             velocities = [0.0]*NUM_OF_JOINTS
             velocities[current_joint] = vel
             vel_pub.publish(ChannelFloat32(values=velocities))
             rospy.sleep(0.1)
-
-        prev_vel = vel
 
         rospy.sleep(0.01)
         stdscr.refresh()

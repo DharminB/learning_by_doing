@@ -5,20 +5,19 @@ from __future__ import print_function
 import copy
 import math
 import rospy
-import numpy as np
 from geometry_msgs.msg import Point, PointStamped, Vector3
 from visualization_msgs.msg import Marker
 from sensor_msgs.msg import JointState
 
-LAST_POS = np.array([0.0, 0.0, 0.0])
+LAST_POS = [0.0, 0.0, 0.0]
 STOPPED_MOVING = False
 
 def joint_state_cb(msg):
     global STOPPED_MOVING, LAST_POS
-    new_pos = np.array(msg.position)
-    diff = new_pos - LAST_POS
+    new_pos = msg.position
+    diff_squared = [(new_pos[i] - LAST_POS[i])**2 for i in range(len(LAST_POS))]
     LAST_POS = new_pos
-    STOPPED_MOVING = np.linalg.norm(diff) < 0.0001
+    STOPPED_MOVING = sum(diff_squared)**0.5 < 0.0001
 
 def main():
     pub = rospy.Publisher('/arm_controller/cart_vel_command', Vector3, queue_size=1)
@@ -54,7 +53,6 @@ def main():
         marker.points.append(new_point)
         marker.points.append(new_end_point)
     marker_cell_pub.publish(marker)
-        
 
     rospy.sleep(1.0)
     while not STOPPED_MOVING:
@@ -70,7 +68,7 @@ def main():
 
     pub.publish(zero_vel)
     rospy.sleep(1.0)
-    
+
 
 if __name__ == "__main__":
     rospy.init_node('follow_cart_line')
